@@ -1,32 +1,19 @@
 {
-  "name": "scrapechain",
-  "license": "MIT",
-  "version": "0.0.3",
-  "description": "An end-to-end scraping framework with an emphasis on web-unlocking",
-  "main": "dist/index.js",
-  "module": "dist/index.mjs",
-  "types": "dist/index.d.ts",
+  "name": "scrapechain-monorepo",
+  "private": true,
+  "packageManager": "bun@1.2.4",
+  "workspaces": ["packages/*"],
   "scripts": {
-    "build": "tsup index.ts --format cjs,esm --dts",
-    "lint": "tsc",
-    "release": "bun run build && changeset publish"
+    "build": "bun run --filter './packages/*' build",
+    "lint": "tsc --build tsconfig.json",
+    "changeset": "changeset",                      
+    "version": "changeset version",
+    "release": "bun run build --workspace && changeset publish"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.4",
     "@types/bun": "latest",
     "tsup": "^8.5.0",
     "typescript": "^5"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/colindaniels/scrapechain.git"
-  },
-  "keywords": [
-    "scrapechain"
-  ],
-  "author": "colindaniels",
-  "bugs": {
-    "url": "https://github.com/colindaniels/scrapechain/issues"
-  },
-  "homepage": "https://github.com/colindaniels/scrapechain#readme"
+  }
 }
