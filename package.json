@@ -1,8 +1,8 @@
 {
   "name": "scrapechain",
   "license": "MIT",
-  "version": "0.0.1",
-  "description": "Placeholder for the crawlchain open source project. Full implementation coming soon!",
+  "version": "0.0.2",
+  "description": "An end-to-end scraping framework with an emphasis on web-unlocking",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
