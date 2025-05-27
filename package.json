@@ -1,0 +1,32 @@
+{
+  "name": "scrapechain",
+  "license": "MIT",
+  "version": "0.0.1",
+  "description": "Placeholder for the crawlchain open source project. Full implementation coming soon!",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsup index.ts --format cjs,esm --dts",
+    "lint": "tsc",
+    "release": "bun run build && changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.29.4",
+    "@types/bun": "latest",
+    "tsup": "^8.5.0",
+    "typescript": "^5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/colindaniels/scrapechain.git"
+  },
+  "keywords": [
+    "scrapechain"
+  ],
+  "author": "colindaniels",
+  "bugs": {
+    "url": "https://github.com/colindaniels/scrapechain/issues"
+  },
+  "homepage": "https://github.com/colindaniels/scrapechain#readme"
+}
