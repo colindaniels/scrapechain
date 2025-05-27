@@ -1,7 +1,7 @@
 {
   "name": "scrapechain",
   "license": "MIT",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "An end-to-end scraping framework with an emphasis on web-unlocking",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
