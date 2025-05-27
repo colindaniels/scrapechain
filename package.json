@@ -8,7 +8,7 @@
     "lint": "tsc --build tsconfig.json",
     "changeset": "changeset",                      
     "version": "changeset version",
-    "release": "bun run build --workspace && changeset publish"
+    "release": "bun run build && changeset publish"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.4",
