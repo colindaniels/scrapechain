@@ -1,5 +1,11 @@
 # @scrapechain/oxylabs
 
+## 0.0.4
+
+### Patch Changes
+
+- 62af3d6: remove peerDependency
+
 ## 0.0.3
 
 ### Patch Changes
