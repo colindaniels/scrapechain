@@ -1,5 +1,3 @@
 // new version again
 
-import { OxylabsProxy } from './OxylabsProxy'
-
-export { OxylabsProxy }
+export { OxylabsResidentialProxy } from './ResidentialProxy'
