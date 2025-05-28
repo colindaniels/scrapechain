@@ -1,5 +1,11 @@
 # @scrapechain/oxylabs
 
+## 0.1.0
+
+### Minor Changes
+
+- 28d4b0c: Oxylabs proxy support
+
 ## 0.0.4
 
 ### Patch Changes
