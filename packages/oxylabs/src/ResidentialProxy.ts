@@ -1,6 +1,6 @@
 import { countryCodeMap, type Country } from "./utils/index";
-
-import type { ProxyConnectionDetails } from '@scrapechain/types'
+import { Proxy } from '@scrapechain/proxy'
+import type { ProxyPrimitiveDetails } from '@scrapechain/proxy'
 
 interface ProxyOptions {
   username: string;
@@ -41,7 +41,7 @@ function normalizeOptions(options: ProxyOptions): NormalizedProxyOptions {
 
   return {
     port: 7777,
-    endpoint: 'pr.proxylabs.io',
+    endpoint: 'pr.oxylabs.io',
     protocol: "http",
     stickySessionId,
     stickySessionDurationMinutes,
@@ -50,12 +50,13 @@ function normalizeOptions(options: ProxyOptions): NormalizedProxyOptions {
 }
 
 
-export class OxylabsResidentialProxy {
+export class OxylabsResidentialProxy extends Proxy {
   // Declares that the this.options exists with a type but is not initialized yet.
 
   public options: NormalizedProxyOptions;
 
   constructor(initial_options: ProxyOptions) {
+    super();
     // set defaults for the non-required and non-null
     this.options = normalizeOptions(initial_options);
 
@@ -77,13 +78,6 @@ export class OxylabsResidentialProxy {
   }
 
 
-  public toUrl(): string {
-    const { protocol, password, endpoint, port } = this.options;
-    const username = this.constructUsername();
-
-    return `${protocol}://${username}:${password}@${endpoint}:${port}`;
-  }
-
   rotate(): this {
     if (this.options.sticky) {
       this.options.stickySessionId = generateSessionId();
@@ -91,7 +85,7 @@ export class OxylabsResidentialProxy {
     return this;
   }
 
-  get details(): ProxyConnectionDetails {
+  get details(): ProxyPrimitiveDetails {
     return {
       protocol: this.options.protocol,
       endpoint: this.options.endpoint,
