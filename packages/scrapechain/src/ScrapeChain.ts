@@ -3,7 +3,7 @@ import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import type { AxiosRequestConfig, AxiosResponse } from "axios";
 import { HttpsProxyAgent } from "https-proxy-agent";
-import { BaseProxy } from '@scrapechain/proxy'
+import { GenericProxy } from '@scrapechain/proxy'
 import type { Proxy } from "@scrapechain/proxy";
 import UserAgent from 'user-agents'
 
@@ -12,7 +12,7 @@ puppeteer.use(StealthPlugin())
 
 
 
-export class ScrapeCahin {
+export class ScrapeChain {
   private proxy?: Proxy;
   private userAgent?: string;
 
@@ -20,9 +20,10 @@ export class ScrapeCahin {
   setProxy(proxy: Proxy | string): this {
     if (typeof proxy === 'string') {
       // pass into baseproxy as string so it can convert to normal Proxy
-      this.proxy = new BaseProxy(proxy)
+      this.proxy = new GenericProxy(proxy)
     }
     else {
+      // can still be GenericProxy, but user has sent it in as the GenericProxy object or a vendor object
       this.proxy = proxy;
     }
     return this;
