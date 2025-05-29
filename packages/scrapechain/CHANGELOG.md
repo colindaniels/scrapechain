@@ -1,5 +1,13 @@
 # scrapechain
 
+## 0.0.8
+
+### Patch Changes
+
+- 1da6475: updated proxy logic
+- Updated dependencies [1da6475]
+  - @scrapechain/proxy@0.0.3
+
 ## 0.0.7
 
 ### Patch Changes
