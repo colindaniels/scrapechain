@@ -1,5 +1,13 @@
 # scrapechain
 
+## 0.0.6
+
+### Patch Changes
+
+- 5989434: Added more features and better types
+- Updated dependencies [5989434]
+  - @scrapechain/types@0.0.2
+
 ## 0.0.5
 
 ### Patch Changes

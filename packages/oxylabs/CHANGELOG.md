@@ -1,5 +1,13 @@
 # @scrapechain/oxylabs
 
+## 0.1.1
+
+### Patch Changes
+
+- 5989434: Added more features and better types
+- Updated dependencies [5989434]
+  - @scrapechain/types@0.0.2
+
 ## 0.1.0
 
 ### Minor Changes
