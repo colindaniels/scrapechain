@@ -1,5 +1,13 @@
 # scrapechain
 
+## 0.0.9
+
+### Patch Changes
+
+- 12f49bd: added setUserAgent + proxy change
+- Updated dependencies [12f49bd]
+  - @scrapechain/proxy@0.0.4
+
 ## 0.0.8
 
 ### Patch Changes
