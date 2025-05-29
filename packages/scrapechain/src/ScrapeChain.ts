@@ -1,7 +1,7 @@
 import axios from "axios";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
-import type { AxiosRequestConfig, AxiosResponse } from "axios";
+import type { AxiosRequestConfig, AxiosRequestHeaders, AxiosResponse } from "axios";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { GenericProxy } from '@scrapechain/proxy'
 import type { Proxy } from "@scrapechain/proxy";
@@ -11,15 +11,13 @@ import UserAgent from 'user-agents'
 puppeteer.use(StealthPlugin())
 
 
-
 export class ScrapeChain {
   private proxy?: Proxy;
   private userAgent?: string;
 
-
   setProxy(proxy: Proxy | string): this {
     if (typeof proxy === 'string') {
-      // pass into baseproxy as string so it can convert to normal Proxy
+      // pass into generic as string so it can convert to normal Proxy
       this.proxy = new GenericProxy(proxy)
     }
     else {
@@ -29,12 +27,29 @@ export class ScrapeChain {
     return this;
 
   }
+  setUserAgent(userAgent: string | UserAgent): this {
 
-  async scrape(url: string, config: AxiosRequestConfig = {}): Promise<AxiosResponse> {
+    if (typeof userAgent === 'string') {
+      this.userAgent = userAgent;
+    }
+    else {
+      this.userAgent = userAgent.toString();
+    }
+    return this;
+  }
+
+  async scrape(url: string, config: AxiosRequestConfig = {}): Promise<string> {
     let agent = null;
     if (this.proxy) {
       const proxyUrl = this.proxy.toUrl();
       agent = new HttpsProxyAgent(proxyUrl);
+    }
+
+    // set header defaults
+    config.headers = {}
+
+    if (this.userAgent) {
+      config.headers['User-Agent'] = this.userAgent;
     }
 
     const response = await axios({
@@ -44,10 +59,17 @@ export class ScrapeChain {
       ...config,
     });
 
-    return response;
+    if (response.data) {
+      return response.data;
+    }
+    else {
+      // TODO: Err handle
+      console.log('AXIOS ERROR')
+      return ''
+    }
   }
 
-  async browserScrape(url: string) {
+  async scrapeBrowser(url: string): Promise<string> {
 
     const browserArgs = ["--no-sandbox", "--disable-setuid-sandbox"];
 
@@ -58,7 +80,7 @@ export class ScrapeChain {
     }
 
     const browser = await puppeteer.launch({
-      headless: false,
+      headless: true,
       args: browserArgs,
     });
     const page = await browser.newPage();
@@ -74,14 +96,15 @@ export class ScrapeChain {
     }
 
     await page.goto(url, { waitUntil: 'networkidle2' })
+    const html = await page.content();
+    browser.close();
+    return html;
   }
 }
 
-// TODO
-// for now start with a super abstracted library, and later on integrate cusomibility.
-
-
-
-
 // TODO:
-// for setProxy and setUserAgent, they should be able to set it with just a string, not a whole object.
+// setBrowserEngine
+
+
+//TODO:
+// Be able to return the browser as an object
