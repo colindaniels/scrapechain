@@ -14,7 +14,7 @@
     "paths": {
       "scrapechain": ["packages/scrapechain/src"],
       "@scrapechain/oxylabs": ["packages/oxylabs/src"],
-      "@scrapechain/types": ["packages/types/src"]
+      "@scrapechain/proxy": ["packages/proxy/src"]
     }
   },
   "include": ["packages/*/src"]

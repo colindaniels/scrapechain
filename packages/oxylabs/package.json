@@ -8,7 +8,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "build": "tsup",
     "clean": "rm -rf dist",
     "lint": "tsc --build tsconfig.json"
   },
@@ -20,6 +20,6 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@scrapechain/types": "*"
+    "@scrapechain/proxy": "*"
   }
 }
