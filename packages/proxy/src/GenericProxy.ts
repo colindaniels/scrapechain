@@ -1,4 +1,4 @@
-import { ProxyDetails, Proxy } from "./index";
+import { ProxyDetails, Proxy } from "./Proxy";
 
 // non-vendor generic proxy
 export class GenericProxy extends Proxy {
