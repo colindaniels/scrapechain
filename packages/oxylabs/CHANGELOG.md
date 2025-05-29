@@ -1,5 +1,13 @@
 # @scrapechain/oxylabs
 
+## 0.2.1
+
+### Patch Changes
+
+- 1da6475: updated proxy logic
+- Updated dependencies [1da6475]
+  - @scrapechain/proxy@0.0.3
+
 ## 0.2.0
 
 ### Minor Changes
