@@ -1,5 +1,13 @@
 # scrapechain
 
+## 0.0.7
+
+### Patch Changes
+
+- 3558975: shared proxy class and types
+- Updated dependencies [3558975]
+  - @scrapechain/proxy@0.0.2
+
 ## 0.0.6
 
 ### Patch Changes
