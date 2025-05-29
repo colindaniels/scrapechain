@@ -1,1 +1,1 @@
-export { ScrapeCahin } from './ScrapeChain'
+export { ScrapeChain } from './ScrapeChain'

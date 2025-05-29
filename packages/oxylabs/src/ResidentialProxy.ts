@@ -1,6 +1,6 @@
 import { countryCodeMap, type Country } from "./utils/index";
 import { Proxy } from '@scrapechain/proxy'
-import type { ProxyPrimitiveDetails } from '@scrapechain/proxy'
+import type { ProxyDetails } from '@scrapechain/proxy'
 
 interface ProxyOptions {
   username: string;
@@ -85,7 +85,7 @@ export class OxylabsResidentialProxy extends Proxy {
     return this;
   }
 
-  get details(): ProxyPrimitiveDetails {
+  get details(): ProxyDetails {
     return {
       protocol: this.options.protocol,
       endpoint: this.options.endpoint,
