@@ -13,7 +13,8 @@
     "baseUrl": ".",
     "paths": {
       "scrapechain": ["packages/scrapechain/src"],
-      "@scrapechain/oxylabs": ["packages/oxylabs/src"]
+      "@scrapechain/oxylabs": ["packages/oxylabs/src"],
+      "@scrapechain/types": ["packages/types/src"]
     }
   },
   "include": ["packages/*/src"]
