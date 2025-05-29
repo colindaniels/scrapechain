@@ -1,5 +1,16 @@
 # @scrapechain/oxylabs
 
+## 0.2.0
+
+### Minor Changes
+
+- 3558975: shared proxy class and types
+
+### Patch Changes
+
+- Updated dependencies [3558975]
+  - @scrapechain/proxy@0.0.2
+
 ## 0.1.1
 
 ### Patch Changes

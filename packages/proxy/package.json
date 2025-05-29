@@ -1,22 +1,22 @@
 {
-    "name": "@scrapechain/proxy",
-    "version": "0.0.1",
-    "main": "dist/index.js",
-    "module": "dist/index.mjs",
-    "types": "dist/index.d.ts",
-    "files": [
-      "dist"
-    ],
-    "scripts": {
-      "build": "tsup",
-      "clean": "rm -rf dist",
-      "lint": "tsc --build tsconfig.json"
-    },
-    "publishConfig": {
-      "access": "public"
-    },
-    "devDependencies": {
-      "tsup": "^8.5.0",
-      "typescript": "^5"
-    }
+  "name": "@scrapechain/proxy",
+  "version": "0.0.2",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "clean": "rm -rf dist",
+    "lint": "tsc --build tsconfig.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.0",
+    "typescript": "^5"
   }
+}
