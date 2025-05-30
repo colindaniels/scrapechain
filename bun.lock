@@ -19,7 +19,7 @@
     },
     "packages/oxylabs": {
       "name": "@scrapechain/oxylabs",
-      "version": "0.1.1",
+      "version": "0.2.1",
       "dependencies": {
         "@scrapechain/proxy": "*",
       },
@@ -30,7 +30,11 @@
     },
     "packages/proxy": {
       "name": "@scrapechain/proxy",
-      "version": "0.0.1",
+      "version": "0.0.4",
+      "dependencies": {
+        "axios": "^1.9.0",
+        "https-proxy-agent": "^7.0.6",
+      },
       "devDependencies": {
         "tsup": "^8.5.0",
         "typescript": "^5",
@@ -38,7 +42,7 @@
     },
     "packages/scrapechain": {
       "name": "scrapechain",
-      "version": "0.0.6",
+      "version": "0.0.9",
       "dependencies": {
         "@scrapechain/proxy": "*",
         "axios": "^1.9.0",
