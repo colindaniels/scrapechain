@@ -1,5 +1,16 @@
 # scrapechain
 
+## 0.1.0
+
+### Minor Changes
+
+- 141abfb: alpha-prototype
+
+### Patch Changes
+
+- Updated dependencies [141abfb]
+  - @scrapechain/proxy@0.0.5
+
 ## 0.0.9
 
 ### Patch Changes

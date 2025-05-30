@@ -1,5 +1,11 @@
 # @scrapechain/proxy
 
+## 0.0.5
+
+### Patch Changes
+
+- 141abfb: alpha-prototype
+
 ## 0.0.4
 
 ### Patch Changes
