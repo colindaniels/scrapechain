@@ -36,7 +36,7 @@ const proxy = new OxylabsResidentialProxy({
 });
 ```
 
-Construct your proxy with [Proxy Properties](#proxy-properties).
+Construct your proxy with [Proxy Properties](#️-proxy-properties).
 
 <br/>
 
@@ -70,7 +70,7 @@ Sets `sessionid` to a random number, which will point to a new IP address.
 console.log(proxy.details)
 
 ```
-```json
+```ts
 {
   protocol: "http",
   endpoint: "pr.oxylabs.io",
@@ -89,7 +89,7 @@ const ipDetails = await proxy.pingIp();
 
 console.log(ipDetails)
 ```
-```json
+```ts
 {
   success: true,
   ip: "76.91.176.189",
