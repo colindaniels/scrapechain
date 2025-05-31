@@ -1,7 +1,7 @@
 {
   "name": "@scrapechain/oxylabs",
   "description": "Oxylabs proxy SDK for ScrapeChain – generate proxy URLs, rotate IPs, and more.",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
