@@ -1,5 +1,11 @@
 # @scrapechain/oxylabs
 
+## 0.2.2
+
+### Patch Changes
+
+- c97805a: added docs
+
 ## 0.2.1
 
 ### Patch Changes
