@@ -2,7 +2,7 @@
 # @scrapechain/oxylabs
 
 A lightweight, unofficial SDK for using Oxylabs proxies.
-Includes helper methods for rotating sessions, generating endpoints, and more  — all through a consistent interface shared across proxy providers.
+Includes helper methods for rotating sessions, generating endpoints, and more  — all provided through a consistent interface shared across proxy providers.
 
 <br/>
 
@@ -15,7 +15,6 @@ Includes helper methods for rotating sessions, generating endpoints, and more  �
 <br/>
 
 ## 📦 Installation
-Install my-project with npm
 ```bash
   npm install @scrapechain/oxylabs
 ```
@@ -53,7 +52,7 @@ Returns a full proxy URL string.
 
 Since the `sticky` property is truthy, it embeds a random sessionid in the username.
 
-The sessoin length defaults to 10 min, but can be changed with `stickySessionDurationMinutes` (max 30 min). The sessionid will stay the same until `.rotate()` is invoked or manually overridden with the property `stickySessionId`.
+The session length defaults to 10 min, but can be changed with `stickySessionDurationMinutes` (max 30 min). The sessionid will stay the same until `.rotate()` is invoked or manually overridden with the property `stickySessionId`.
 
 <br/>
 
@@ -62,24 +61,6 @@ The sessoin length defaults to 10 min, but can be changed with `stickySessionDur
 proxy.rotate();
 ```
 Sets `sessionid` to a random number, which will point to a new IP address.
-
-<br/>
-
-#### `.details`
-```ts
-console.log(proxy.details)
-
-```
-```ts
-{
-  protocol: "http",
-  endpoint: "pr.oxylabs.io",
-  port: 7777,
-  username: "customer-yourOxylabsUsername-cc-US-sessid-5245948176-sesstime-10",
-  password: "yourPassword",
-}
-```
-A getter that Provides proxy details that are common among all proxys (not just Oxylabs).
 
 <br/>
 
@@ -100,6 +81,26 @@ Verifies the proxy is working and returns the IP and latency.
 
 This will make a quick request to https://api.ipify.org/?format=json
 
+<br/>
+
+#### `.details`
+```ts
+console.log(proxy.details)
+
+```
+```ts
+{
+  protocol: "http",
+  endpoint: "pr.oxylabs.io",
+  port: 7777,
+  username: "customer-yourOxylabsUsername-cc-US-sessid-5245948176-sesstime-10",
+  password: "yourPassword",
+}
+```
+Returns a structured object with proxy connection details.
+
+This is part of a common interface shared across all providers.
+
 
 
 <br/>
@@ -116,3 +117,9 @@ This will make a quick request to https://api.ipify.org/?format=json
 | `port`                        | `number`                          | ❌       | `7777`           | Proxy port.                                                                 |
 | `endpoint`                    | `string`                          | ❌       | `pr.oxylabs.io`  | Proxy hostname.                                                              |
 | `protocol`                    | `"http"`, `"https"`, `"socks5"`   | ❌       | `"http"`         | Proxy protocol to use.                                                      |
+
+<br/>
+
+## License
+
+This project is licensed under the [MIT](LICENSE). See the [LICENSE](LICENSE) file for details.

@@ -21,5 +21,9 @@
   },
   "dependencies": {
     "@scrapechain/proxy": "*"
-  }
+  },
+  "keywords": [
+    "oxylabs",
+    "scrapechain"
+  ]
 }
