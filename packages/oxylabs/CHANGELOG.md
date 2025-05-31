@@ -1,5 +1,11 @@
 # @scrapechain/oxylabs
 
+## 0.2.3
+
+### Patch Changes
+
+- 7dcaa3f: docs fix
+
 ## 0.2.2
 
 ### Patch Changes
