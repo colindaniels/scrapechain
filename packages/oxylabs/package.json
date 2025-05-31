@@ -1,5 +1,6 @@
 {
   "name": "@scrapechain/oxylabs",
+  "description": "Oxylabs proxy SDK for ScrapeChain – generate proxy URLs, rotate IP, and more.",
   "version": "0.2.4",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -21,6 +22,16 @@
   },
   "dependencies": {
     "@scrapechain/proxy": "*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/colindaniels/scrapechain",
+    "directory": "packages/oxylabs"
+  },
+  "homepage": "https://github.com/colindaniels/scrapechain/tree/main/packages/oxylabs",
+  "author": {
+    "name": "Colin Daniels",
+    "email": "colin.daniels@nandor.net"
   },
   "keywords": [
     "oxylabs",
