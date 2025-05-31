@@ -7,10 +7,10 @@ Includes helper methods for rotating sessions, generating endpoints, and more  â
 <br/>
 
 ## ðŸš€ Features
-- Smart session management (sticky/non-sticky)
-- Dynamic session ID generation
-- Auto-normalized proxy options
-- Consistent API shared across all scrapechain compatible proxy SDKs
+- Converts proxy options into a ready-to-use URL
+- Built-in defaults for protocol, endpoint, port, and session behavior
+- Easy session rotation to change IP addresses
+- Normalized configuration interface across all ScrapeChain proxy SDKs
 
 <br/>
 
