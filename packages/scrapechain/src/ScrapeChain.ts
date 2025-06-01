@@ -107,93 +107,51 @@ export class ScrapeChain {
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
-  // TODO:
-  // Make more intuitive and add comments.
-  // But this look solid so far.
-  private async _injectPollingListener(
-    page: Page,
-    selector: string,
-    callback: PageListenerCallback,
-    pollingInterval = 2000
-  ) {
+
+  private async _injectPollingListener(page: Page, selector: string, callback: PageListenerCallback, pollingInterval = 2000) {
 
     const listenerId = this._generateListenerId();
     const exposedFnName = `__${listenerId}`;
-    const resetFnName = `__r${listenerId}`;
 
-
-    await page.exposeFunction(resetFnName, () => { });
 
     await page.exposeFunction(exposedFnName, async () => {
-
       await callback(selector, page);
-
-
-      try {
-        await page.evaluate((fn: string) => {
-          // @ts-ignore
-          window[fn]();
-        }, resetFnName);
-      } catch {
-      }
     });
 
 
-    const pollingFunction = (
-      sel: string,
-      callFn: string,
-      resetFn: string,
-      intervalMs: number
-    ) => {
+    const pollingFunction = (sel: string, callFn: string, intervalMs: number) => {
+      // ON EVERY UNIQUE NEW DOC - this executes
       let busy = false;
-
       // @ts-ignore
-      window[resetFn] = () => {
-        busy = false;
-      };
-
-      const doCheck = () => {
-        try {
-          if (!busy && document.querySelector(sel)) {
-            busy = true;
-            // @ts-ignore
-            window[callFn]();
-            return true;
-          }
-        } catch {
-          // ignore transient DOM errors
+      async function doCheck() {
+        if (!busy && document.querySelector(sel)) {
+          busy = true;
+          // @ts-ignore
+          await window[callFn]();
+          busy = false;
         }
-        return false;
       };
 
-
+      // immediate call
       doCheck();
 
+      // & setup interval to call
       setInterval(() => {
-        doCheck();
+          doCheck();
       }, intervalMs);
     };
 
+
+    // MAIN ENTRY
+    // vvvvvvvvvv
     // on any new page OTHER THAN 1st visited page.
     // this is because evaluateOnNewDocument is created on the first page. so any page after the first where it's loaded will trigger.
-    await page.evaluateOnNewDocument(
-      pollingFunction,
-      selector,
-      exposedFnName,
-      resetFnName,
-      pollingInterval
-    );
+    await page.evaluateOnNewDocument(pollingFunction, selector, exposedFnName, pollingInterval);
 
 
     // will run on 1st page loaded
     try {
-      await page.evaluate(
-        pollingFunction,
-        selector,
-        exposedFnName,
-        resetFnName,
-        pollingInterval
-      );
+      await page.evaluate(pollingFunction, selector, exposedFnName, pollingInterval);
     } catch (err: any) {
       const msg = err?.message || "";
       if (!msg.includes("Execution context was destroyed")) {
