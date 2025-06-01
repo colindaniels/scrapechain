@@ -24,13 +24,14 @@ export class ScrapeChain {
 
   private pageListeners: Array<{ selector: string; callback: PageListenerCallback }> = [];
 
-  /** Register a callback whenever `selector` appears anywhere in the page. */
+
   setPageListener(selector: string, callback: PageListenerCallback, pollingInterval?: number): this {
     this.pageListeners.push({ selector, callback });
-    // If there's already a page open, attach this listener immediately:
     if (this.page) {
       this._injectPollingListener(this.page, selector, callback, pollingInterval);
     }
+    // TODO:
+    // if no page, throw error. dont return self.
     return this;
   }
 
@@ -104,37 +105,57 @@ export class ScrapeChain {
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
-
-  private async _injectPollingListener(page: Page,
+  // TODO:
+  // Make more intuitive and add comments.
+  // But this look solid so far.
+  private async _injectPollingListener(
+    page: Page,
     selector: string,
     callback: PageListenerCallback,
     pollingInterval = 2000
   ) {
-    // for the end user, this should all happen on a _blank target, no new page.
-    // random function name to avoid overlap
-    const listnerId = this._generateListenerId();
-    // expose unique function name on window that puppeteer can call back into node
-    const exposedFnName = `__${listnerId}`;
-    const resetFnName   = `__r${listnerId}`;
+
+    const listenerId = this._generateListenerId();
+    const exposedFnName = `__${listenerId}`;
+    const resetFnName = `__r${listenerId}`;
 
 
-    await page.exposeFunction(resetFnName, () => {
-      // No-op here; this just creates window[resetFnName]() in page context.
-      // The actual logic of resetting `busy` is inside our pollingFunction below.
+    await page.exposeFunction(resetFnName, () => { });
+
+    await page.exposeFunction(exposedFnName, async () => {
+
+      await callback(selector, page);
+
+
+      try {
+        await page.evaluate((fn: string) => {
+          // @ts-ignore
+          window[fn]();
+        }, resetFnName);
+      } catch {
+      }
     });
 
-    // set cacllback function in browser window
-    await page.exposeFunction(exposedFnName, () => {
-      callback(selector, page);
-    });
 
+    const pollingFunction = (
+      sel: string,
+      callFn: string,
+      resetFn: string,
+      intervalMs: number
+    ) => {
+      let busy = false;
 
-    function JSpollingFunction(sel: string, fn: string, intervalMs: number) {
+      // @ts-ignore
+      window[resetFn] = () => {
+        busy = false;
+      };
+
       const doCheck = () => {
         try {
-          if (document.querySelector(sel)) {
+          if (!busy && document.querySelector(sel)) {
+            busy = true;
             // @ts-ignore
-            window[fn]();
+            window[callFn]();
             return true;
           }
         } catch {
@@ -143,38 +164,40 @@ export class ScrapeChain {
         return false;
       };
 
-      // Run a 1 off immediate check right now:
-      if (doCheck()) {
-        return;
-      }
 
-      // 3b) Otherwise, poll every `interval` ms until we succeed:
-      const timer = setInterval(() => {
-        if (doCheck()) {
-          clearInterval(timer);
-        }
+      doCheck();
+
+      setInterval(() => {
+        doCheck();
       }, intervalMs);
     };
 
-
-
     // on any new page OTHER THAN 1st visited page.
     // this is because evaluateOnNewDocument is created on the first page. so any page after the first where it's loaded will trigger.
-    await page.evaluateOnNewDocument(JSpollingFunction, selector, exposedFnName, pollingInterval);
+    await page.evaluateOnNewDocument(
+      pollingFunction,
+      selector,
+      exposedFnName,
+      resetFnName,
+      pollingInterval
+    );
 
 
-    // run on 1st
+    // will run on 1st page loaded
     try {
-      await page.evaluate(JSpollingFunction, selector, exposedFnName, pollingInterval);
+      await page.evaluate(
+        pollingFunction,
+        selector,
+        exposedFnName,
+        resetFnName,
+        pollingInterval
+      );
     } catch (err: any) {
-      const message = err?.message || "";
-      if (!message.includes("Execution context was destroyed")) {
+      const msg = err?.message || "";
+      if (!msg.includes("Execution context was destroyed")) {
         throw err;
       }
-      // otherwise ignore, because navigation raced our injection
     }
-
-
   }
 
 
