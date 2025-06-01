@@ -1,5 +1,11 @@
 # scrapechain
 
+## 0.1.1
+
+### Patch Changes
+
+- c30a958: added watch selector
+
 ## 0.1.0
 
 ### Minor Changes
