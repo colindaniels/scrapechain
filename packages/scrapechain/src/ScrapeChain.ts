@@ -25,7 +25,7 @@ export class ScrapeChain {
   private pageListeners: Array<{ selector: string; callback: PageListenerCallback }> = [];
 
 
-  setPageListener(selector: string, callback: PageListenerCallback, pollingInterval?: number): this {
+  watchSelector(selector: string, callback: PageListenerCallback, pollingInterval?: number): this {
     this.pageListeners.push({ selector, callback });
     if (this.page) {
       this._injectPollingListener(this.page, selector, callback, pollingInterval);
