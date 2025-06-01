@@ -1,5 +1,11 @@
 # scrapechain
 
+## 0.1.2
+
+### Patch Changes
+
+- a748729: better watchSelector reliability
+
 ## 0.1.1
 
 ### Patch Changes
