@@ -1,5 +1,6 @@
 import axios from "axios";
 import puppeteer from "puppeteer-extra";
+import type { LaunchOptions } from 'puppeteer'
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import type { AxiosRequestConfig, AxiosRequestHeaders, AxiosResponse } from "axios";
 import { HttpsProxyAgent } from "https-proxy-agent";
@@ -11,14 +12,30 @@ import UserAgent from 'user-agents'
 
 puppeteer.use(StealthPlugin())
 
+type PageListenerCallback = (selector: string, page: Page) => void;
 
 
+// TODO: Put browser related fn's into their own class, function, or file. need to be seperated at this point.
 
 export class ScrapeChain {
   private proxy?: Proxy;
   private userAgent?: string;
-  private browser?: Browser;
-  private page?: Page;
+  public browser!: Browser;
+  public page!: Page;
+
+
+  private pageListeners: Array<{ selector: string; callback: PageListenerCallback }> = [];
+
+
+  watchSelector(selector: string, callback: PageListenerCallback, pollingInterval?: number): this {
+    this.pageListeners.push({ selector, callback });
+    if (this.page) {
+      this._injectPollingListener(this.page, selector, callback, pollingInterval);
+    }
+    // TODO:
+    // if no page, throw error. dont return self.
+    return this;
+  }
 
 
   setProxy(proxy: Proxy | string): this {
@@ -51,7 +68,7 @@ export class ScrapeChain {
   }
 
 
-  async createBrowser(): Promise<Browser> {
+  async createBrowser(launchOptions: LaunchOptions = {}): Promise<Browser> {
     const browserArgs = ["--no-sandbox", "--disable-setuid-sandbox"];
 
     if (this.proxy) {
@@ -64,6 +81,7 @@ export class ScrapeChain {
     const browser = await puppeteer.launch({
       headless: true,
       args: browserArgs,
+      ...launchOptions
     });
     const page = await browser.newPage();
 
@@ -81,6 +99,107 @@ export class ScrapeChain {
     this.browser = browser;
     this.page = page;
     return browser;
+  }
+
+  private _generateListenerId(): number {
+    const min = 1_000_000;
+    const max = 9_999_999_999;
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  // TODO:
+  // Make more intuitive and add comments.
+  // But this look solid so far.
+  private async _injectPollingListener(
+    page: Page,
+    selector: string,
+    callback: PageListenerCallback,
+    pollingInterval = 2000
+  ) {
+
+    const listenerId = this._generateListenerId();
+    const exposedFnName = `__${listenerId}`;
+    const resetFnName = `__r${listenerId}`;
+
+
+    await page.exposeFunction(resetFnName, () => { });
+
+    await page.exposeFunction(exposedFnName, async () => {
+
+      await callback(selector, page);
+
+
+      try {
+        await page.evaluate((fn: string) => {
+          // @ts-ignore
+          window[fn]();
+        }, resetFnName);
+      } catch {
+      }
+    });
+
+
+    const pollingFunction = (
+      sel: string,
+      callFn: string,
+      resetFn: string,
+      intervalMs: number
+    ) => {
+      let busy = false;
+
+      // @ts-ignore
+      window[resetFn] = () => {
+        busy = false;
+      };
+
+      const doCheck = () => {
+        try {
+          if (!busy && document.querySelector(sel)) {
+            busy = true;
+            // @ts-ignore
+            window[callFn]();
+            return true;
+          }
+        } catch {
+          // ignore transient DOM errors
+        }
+        return false;
+      };
+
+
+      doCheck();
+
+      setInterval(() => {
+        doCheck();
+      }, intervalMs);
+    };
+
+    // on any new page OTHER THAN 1st visited page.
+    // this is because evaluateOnNewDocument is created on the first page. so any page after the first where it's loaded will trigger.
+    await page.evaluateOnNewDocument(
+      pollingFunction,
+      selector,
+      exposedFnName,
+      resetFnName,
+      pollingInterval
+    );
+
+
+    // will run on 1st page loaded
+    try {
+      await page.evaluate(
+        pollingFunction,
+        selector,
+        exposedFnName,
+        resetFnName,
+        pollingInterval
+      );
+    } catch (err: any) {
+      const msg = err?.message || "";
+      if (!msg.includes("Execution context was destroyed")) {
+        throw err;
+      }
+    }
   }
 
 
