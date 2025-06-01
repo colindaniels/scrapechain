@@ -15,6 +15,8 @@ puppeteer.use(StealthPlugin())
 type PageListenerCallback = (selector: string, page: Page) => void;
 
 
+// TODO: Put browser related fn's into their own class, function, or file. need to be seperated at this point.
+
 export class ScrapeChain {
   private proxy?: Proxy;
   private userAgent?: string;
