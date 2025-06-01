@@ -1,5 +1,6 @@
 import axios from "axios";
 import puppeteer from "puppeteer-extra";
+import type { LaunchOptions } from 'puppeteer'
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import type { AxiosRequestConfig, AxiosRequestHeaders, AxiosResponse } from "axios";
 import { HttpsProxyAgent } from "https-proxy-agent";
@@ -11,14 +12,27 @@ import UserAgent from 'user-agents'
 
 puppeteer.use(StealthPlugin())
 
-
+type PageListenerCallback = (selector: string, page: Page) => void;
 
 
 export class ScrapeChain {
   private proxy?: Proxy;
   private userAgent?: string;
-  private browser?: Browser;
-  private page?: Page;
+  public browser!: Browser;
+  public page!: Page;
+
+
+  private pageListeners: Array<{ selector: string; callback: PageListenerCallback }> = [];
+
+  /** Register a callback whenever `selector` appears anywhere in the page. */
+  setPageListener(selector: string, callback: PageListenerCallback, pollingInterval?: number): this {
+    this.pageListeners.push({ selector, callback });
+    // If there's already a page open, attach this listener immediately:
+    if (this.page) {
+      this._injectPollingListener(this.page, selector, callback, pollingInterval);
+    }
+    return this;
+  }
 
 
   setProxy(proxy: Proxy | string): this {
@@ -51,7 +65,7 @@ export class ScrapeChain {
   }
 
 
-  async createBrowser(): Promise<Browser> {
+  async createBrowser(launchOptions: LaunchOptions = {}): Promise<Browser> {
     const browserArgs = ["--no-sandbox", "--disable-setuid-sandbox"];
 
     if (this.proxy) {
@@ -64,6 +78,7 @@ export class ScrapeChain {
     const browser = await puppeteer.launch({
       headless: true,
       args: browserArgs,
+      ...launchOptions
     });
     const page = await browser.newPage();
 
@@ -81,6 +96,85 @@ export class ScrapeChain {
     this.browser = browser;
     this.page = page;
     return browser;
+  }
+
+  private _generateListenerId(): number {
+    const min = 1_000_000;
+    const max = 9_999_999_999;
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+
+  private async _injectPollingListener(page: Page,
+    selector: string,
+    callback: PageListenerCallback,
+    pollingInterval = 2000
+  ) {
+    // for the end user, this should all happen on a _blank target, no new page.
+    // random function name to avoid overlap
+    const listnerId = this._generateListenerId();
+    // expose unique function name on window that puppeteer can call back into node
+    const exposedFnName = `__${listnerId}`;
+    const resetFnName   = `__r${listnerId}`;
+
+
+    await page.exposeFunction(resetFnName, () => {
+      // No-op here; this just creates window[resetFnName]() in page context.
+      // The actual logic of resetting `busy` is inside our pollingFunction below.
+    });
+
+    // set cacllback function in browser window
+    await page.exposeFunction(exposedFnName, () => {
+      callback(selector, page);
+    });
+
+
+    function JSpollingFunction(sel: string, fn: string, intervalMs: number) {
+      const doCheck = () => {
+        try {
+          if (document.querySelector(sel)) {
+            // @ts-ignore
+            window[fn]();
+            return true;
+          }
+        } catch {
+          // ignore transient DOM errors
+        }
+        return false;
+      };
+
+      // Run a 1 off immediate check right now:
+      if (doCheck()) {
+        return;
+      }
+
+      // 3b) Otherwise, poll every `interval` ms until we succeed:
+      const timer = setInterval(() => {
+        if (doCheck()) {
+          clearInterval(timer);
+        }
+      }, intervalMs);
+    };
+
+
+
+    // on any new page OTHER THAN 1st visited page.
+    // this is because evaluateOnNewDocument is created on the first page. so any page after the first where it's loaded will trigger.
+    await page.evaluateOnNewDocument(JSpollingFunction, selector, exposedFnName, pollingInterval);
+
+
+    // run on 1st
+    try {
+      await page.evaluate(JSpollingFunction, selector, exposedFnName, pollingInterval);
+    } catch (err: any) {
+      const message = err?.message || "";
+      if (!message.includes("Execution context was destroyed")) {
+        throw err;
+      }
+      // otherwise ignore, because navigation raced our injection
+    }
+
+
   }
 
 
