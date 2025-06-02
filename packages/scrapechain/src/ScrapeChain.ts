@@ -12,7 +12,7 @@ import UserAgent from 'user-agents'
 
 puppeteer.use(StealthPlugin())
 
-type PageListenerCallback = (selector: string, page: Page) => void;
+type PageListenerCallback = (selector: string, page: Page, htmlDoc: string) => void;
 
 
 // TODO: Put browser related fn's into their own class, function, or file. need to be seperated at this point.
@@ -114,8 +114,8 @@ export class ScrapeChain {
     const exposedFnName = `__${listenerId}`;
 
 
-    await page.exposeFunction(exposedFnName, async () => {
-      await callback(selector, page);
+    await page.exposeFunction(exposedFnName, async (htmlDoc: string) => {
+      await callback(selector, page, htmlDoc);
     });
 
 
@@ -126,8 +126,10 @@ export class ScrapeChain {
       async function doCheck() {
         if (!busy && document.querySelector(sel)) {
           busy = true;
+
+          const html = document.documentElement.outerHTML;
           // @ts-ignore
-          await window[callFn]();
+          await window[callFn](html);
           busy = false;
         }
       };
@@ -208,20 +210,5 @@ export class ScrapeChain {
 // setBrowserEngine (choose between puppeteer or playwright)
 
 
-//TODO:
-// Be able to return the browser as an object
-
-
 // TODO:
-// Be able to rotate user agent
-
-// TODO:
-// Can get the browser at any time.
-// good example would be set the captcha listeners, then get the browser object, then do their own scraping with puppeteer/playwright
-
-// TODO:
-// not sure if plausible, but after a solved captcha, they can put it back into the ScrapeChain object and then continue through the ScrapeChain. idk though
-
-
-// TODO:
-// integrate my other AI opensource that utilizes AI to parse the data
+// integrate my other AI opensource that uses RAG to parse the data
