@@ -1,5 +1,11 @@
 # scrapechain
 
+## 0.1.3
+
+### Patch Changes
+
+- e79bc93: page watcher returns doc html in callback
+
 ## 0.1.2
 
 ### Patch Changes
