@@ -1,5 +1,11 @@
 # scrapechain
 
+## 0.1.4
+
+### Patch Changes
+
+- 4aa02c5: remove src npm
+
 ## 0.1.3
 
 ### Patch Changes
