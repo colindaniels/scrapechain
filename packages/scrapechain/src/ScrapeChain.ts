@@ -1,12 +1,12 @@
 import axios from "axios";
 import puppeteer from "puppeteer-extra";
-import type { LaunchOptions } from 'puppeteer'
+///Applications/Google\ Chrome.app/Contents/MacOS/
+import type { LaunchOptions, Browser, Page, BrowserContextOptions } from 'puppeteer'
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import type { AxiosRequestConfig, AxiosRequestHeaders, AxiosResponse } from "axios";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { GenericProxy } from '@scrapechain/proxy'
 import type { Proxy } from "@scrapechain/proxy";
-import type { Browser, Page, BrowserContextOptions } from 'puppeteer'
 import UserAgent from 'user-agents'
 
 
@@ -20,17 +20,42 @@ type PageListenerCallback = (selector: string, page: Page, htmlDoc: string) => v
 export class ScrapeChain {
   private proxy?: Proxy;
   private userAgent?: string;
-  public browser!: Browser;
+  public browser?: Browser;
   public page!: Page;
 
 
-  private pageListeners: Array<{ selector: string; callback: PageListenerCallback }> = [];
+  // create a type for this
+  private pageListeners: Array<{ selector: string; callback: PageListenerCallback, pollingInterval: number }> = [];
+
+  // Only attach the "targetcreated" handler once
+  private hasGlobalListener = false;
 
 
-  watchSelector(selector: string, callback: PageListenerCallback, pollingInterval?: number): this {
-    this.pageListeners.push({ selector, callback });
-    if (this.page) {
-      this._injectPollingListener(this.page, selector, callback, pollingInterval);
+  watchSelector(selector: string, callback: PageListenerCallback, pollingInterval: number = 2000): this {
+    if (!this.browser || !this.page) throw new Error('watchSelector() can only be applied after createBrowser()')
+    console.log('watching')
+    this.pageListeners.push({ selector, callback, pollingInterval });
+
+    this._injectPollingListener(this.page, selector, callback, pollingInterval);
+
+
+
+    if (!this.hasGlobalListener) {
+      this.hasGlobalListener = true;
+
+      this.browser.on("targetcreated", async (target) => {
+        if (target.type() !== "page") return;
+        const newPage = await target.page();
+        if (!newPage) return;
+
+        console.log("NEW PAGE (caught by targetcreated)");
+
+        // Re‐inject every selector that’s in pageListeners
+        for (const { selector: sel, callback: cb, pollingInterval: pi } of this.pageListeners) {
+          console.log("injecting", sel);
+          await this._injectPollingListener(newPage, sel, cb, pi);
+        }
+      });
     }
     // TODO:
     // if no page, throw error. dont return self.
@@ -69,20 +94,28 @@ export class ScrapeChain {
 
 
   async createBrowser(launchOptions: LaunchOptions = {}): Promise<Browser> {
-    const browserArgs = ["--no-sandbox", "--disable-setuid-sandbox"];
+    const defaultArgs = ["--no-sandbox", "--disable-setuid-sandbox"];
 
     if (this.proxy) {
       const { protocol, endpoint, port } = this.proxy.details;
-      browserArgs.push(
-        `--proxy-server=${protocol}://${endpoint}:${port}`,
-      );
+      defaultArgs.push(`--proxy-server=${protocol}://${endpoint}:${port}`);
     }
+
+    const { args: userArgs = [], ...otherLaunchOptions } = launchOptions;
+
+    const combinedArgs = [...defaultArgs, ...userArgs];
 
     const browser = await puppeteer.launch({
       headless: true,
-      args: browserArgs,
-      ...launchOptions
+      //executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      //defaultViewport: null,
+      args: combinedArgs,
+      ...otherLaunchOptions
     });
+    this.browser = browser;
+
+
+
     const page = await browser.newPage();
 
     if (this.proxy) {
@@ -93,10 +126,10 @@ export class ScrapeChain {
       });
     }
     if (this.userAgent) {
+      //@ts-ignore
       await page.setUserAgent(this.userAgent.toString());
     }
 
-    this.browser = browser;
     this.page = page;
     return browser;
   }
@@ -108,7 +141,7 @@ export class ScrapeChain {
   }
 
 
-  private async _injectPollingListener(page: Page, selector: string, callback: PageListenerCallback, pollingInterval = 2000) {
+  private async _injectPollingListener(page: Page, selector: string, callback: PageListenerCallback, pollingInterval: number) {
 
     const listenerId = this._generateListenerId();
     const exposedFnName = `__${listenerId}`;
@@ -124,6 +157,9 @@ export class ScrapeChain {
       let busy = false;
       // @ts-ignore
       async function doCheck() {
+        console.log('polling')
+        console.log('busy: ' + busy)
+        console.log(!!document.querySelector(sel))
         if (!busy && document.querySelector(sel)) {
           busy = true;
 
@@ -139,20 +175,23 @@ export class ScrapeChain {
 
       // & setup interval to call
       setInterval(() => {
-          doCheck();
+        doCheck();
       }, intervalMs);
     };
 
 
+
+
+
+
     // MAIN ENTRY
     // vvvvvvvvvv
-    // on any new page OTHER THAN 1st visited page.
-    // this is because evaluateOnNewDocument is created on the first page. so any page after the first where it's loaded will trigger.
-    await page.evaluateOnNewDocument(pollingFunction, selector, exposedFnName, pollingInterval);
-
-
-    // will run on 1st page loaded
     try {
+
+      // on any new page OTHER THAN 1st visited page.
+      // this is because evaluateOnNewDocument is created on the first page. so any page after the first where it's loaded will trigger.
+      await page.evaluateOnNewDocument(pollingFunction, selector, exposedFnName, pollingInterval);
+      // will run on 1st page loaded.
       await page.evaluate(pollingFunction, selector, exposedFnName, pollingInterval);
     } catch (err: any) {
       const msg = err?.message || "";
@@ -205,6 +244,11 @@ export class ScrapeChain {
 
 }
 
+
+
+// TODO:
+// Add failCondition()
+// This will add a css selector watcher. if it detects it, it will have a set rules, like rotate proxy, tray again n times before failing.
 
 // TODO:
 // setBrowserEngine (choose between puppeteer or playwright)

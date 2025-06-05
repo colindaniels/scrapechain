@@ -17,11 +17,17 @@
   },
   "devDependencies": {
     "tsup": "^8.5.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "@types/user-agents": "^1.0.4"
   },
   "dependencies": {
+    "@scrapechain/proxy": "*",
     "axios": "^1.9.0",
     "https-proxy-agent": "^7.0.6",
-    "@scrapechain/proxy": "*"
+    "puppeteer": "^24.9.0",
+    "puppeteer-core": "^24.10.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "user-agents": "^1.1.553"
   }
 }
