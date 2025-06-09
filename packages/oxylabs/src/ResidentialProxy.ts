@@ -11,7 +11,7 @@ interface ProxyOptions {
   stickySessionId?: number;
   port?: number;
   endpoint?: string;
-  protocol?: "http" | "https" | "socks5";
+  protocol?: "http" | "https" | "socks5h";
 }
 
 // required fields after sterilization
