@@ -1,8 +1,13 @@
 {
   "name": "scrapechain-monorepo",
-  "private": true,
+  "devDependencies": {
+    "@changesets/cli": "^2.29.4",
+    "@types/bun": "latest",
+    "tsup": "^8.5.0",
+    "typescript": "^5"
+  },
   "packageManager": "bun@1.2.4",
-  "workspaces": ["packages/*"],
+  "private": true,
   "scripts": {
     "build": "bun run --filter './packages/*' build",
     "lint": "tsc --build tsconfig.json",
@@ -10,10 +15,5 @@
     "version": "changeset version",
     "release": "bun run build && changeset publish"
   },
-  "devDependencies": {
-    "@changesets/cli": "^2.29.4",
-    "@types/bun": "latest",
-    "tsup": "^8.5.0",
-    "typescript": "^5"
-  }
+  "workspaces": ["packages/*"]
 }
