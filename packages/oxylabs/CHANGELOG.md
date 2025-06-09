@@ -1,5 +1,11 @@
 # @scrapechain/oxylabs
 
+## 0.2.7
+
+### Patch Changes
+
+- 75cc5d4: country values set to lowercase
+
 ## 0.2.6
 
 ### Patch Changes
