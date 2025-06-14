@@ -20,8 +20,12 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@scrapechain/proxy": "*",
     "axios": "^1.9.0",
+    "chrome-launcher": "^1.2.0",
     "https-proxy-agent": "^7.0.6",
-    "@scrapechain/proxy": "*"
+    "proxy-chain": "^2.5.9",
+    "puppeteer-core": "^24.10.1",
+    "user-agents": "^1.1.568"
   }
 }

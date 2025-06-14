@@ -1,16 +1,13 @@
 import axios from "axios";
-import puppeteer from "puppeteer-extra";
-import type { LaunchOptions } from 'puppeteer'
-import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import type { AxiosRequestConfig, AxiosRequestHeaders, AxiosResponse } from "axios";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { GenericProxy } from '@scrapechain/proxy'
 import type { Proxy } from "@scrapechain/proxy";
-import type { Browser, Page, BrowserContextOptions } from 'puppeteer'
 import UserAgent from 'user-agents'
-
-
-puppeteer.use(StealthPlugin())
+import puppeteer from 'puppeteer-core';
+import type { Page, Browser } from 'puppeteer-core';
+import * as chromeLauncher from 'chrome-launcher';
+import proxyChain from 'proxy-chain'
 
 type PageListenerCallback = (selector: string, page: Page, htmlDoc: string) => void;
 
@@ -68,37 +65,50 @@ export class ScrapeChain {
   }
 
 
-  async createBrowser(launchOptions: LaunchOptions = {}): Promise<Browser> {
-    const browserArgs = ["--no-sandbox", "--disable-setuid-sandbox"];
+  async createBrowser(launchOptions: chromeLauncher.Options = {}): Promise<Browser> {
+
+    const defaultArgs: string[] = [
+      //`--disable-extensions-except=${extensionPath}`,
+      //`--load-extension=${extensionPath}`
+      //'--headless=new',        // run headless; remove if you want the browser UI
+      //'--no-sandbox'
+    ];
 
     if (this.proxy) {
-      const { protocol, endpoint, port } = this.proxy.details;
-      browserArgs.push(
-        `--proxy-server=${protocol}://${endpoint}:${port}`,
-      );
+      const oldProxyUrl = this.proxy.toUrl();
+      const newProxyUrl = await proxyChain.anonymizeProxy(oldProxyUrl);
+      defaultArgs.push(`--proxy-server=${newProxyUrl}`);
     }
 
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: browserArgs,
-      ...launchOptions
+    const {
+      chromeFlags: userArgs = [],
+      ...otherLaunchOptions
+    } = launchOptions;
+
+    const chromeFlags = [
+      ...defaultArgs,
+      ...userArgs
+    ];
+
+    const chrome = await chromeLauncher.launch({
+      chromeFlags,
+      ...otherLaunchOptions
     });
-    const page = await browser.newPage();
 
-    if (this.proxy) {
-      const { username, password } = this.proxy.details;
-      await page.authenticate({
-        username: username,
-        password: password,
-      });
-    }
-    if (this.userAgent) {
-      await page.setUserAgent(this.userAgent.toString());
-    }
+    const browserURL = `http://localhost:${chrome.port}`;
 
+
+    const browser = await puppeteer.connect({
+      browserURL,
+      defaultViewport: null
+    });
+
+    const [page] = await browser.pages();
+    if (!page) throw new Error('NO PAGE');
     this.browser = browser;
     this.page = page;
     return browser;
+
   }
 
   private _generateListenerId(): number {

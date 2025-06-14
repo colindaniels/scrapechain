@@ -1,15 +1,5 @@
 {
   "name": "scrapechain-monorepo",
-  "private": true,
-  "packageManager": "bun@1.2.4",
-  "workspaces": ["packages/*"],
-  "scripts": {
-    "build": "bun run --filter './packages/*' build",
-    "lint": "tsc --build tsconfig.json",
-    "changeset": "changeset",
-    "version": "changeset version",
-    "release": "bun run build && changeset publish"
-  },
   "devDependencies": {
     "@changesets/cli": "^2.29.4",
     "@types/bun": "latest",
@@ -17,10 +7,14 @@
     "tsup": "^8.5.0",
     "typescript": "^5"
   },
-  "dependencies": {
-    "puppeteer": "^24.9.0",
-    "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "user-agents": "^1.1.553"
-  }
+  "packageManager": "bun@1.2.4",
+  "private": true,
+  "scripts": {
+    "build": "bun run --filter './packages/*' build",
+    "lint": "tsc --build tsconfig.json",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "bun run build && changeset publish"
+  },
+  "workspaces": ["packages/*"]
 }
