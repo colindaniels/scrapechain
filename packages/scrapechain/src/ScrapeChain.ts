@@ -14,6 +14,30 @@ type PageListenerCallback = (selector: string, page: Page, htmlDoc: string) => v
 
 // TODO: Put browser related fn's into their own class, function, or file. need to be seperated at this point.
 
+
+interface BlockOptions {
+
+  selector: string;
+
+
+  maxRetries?: number;
+
+  onBlock: (args: {
+    page: Page;
+    scrapeChain: ScrapeChain;
+    attempts: number;
+  }) => Promise<void> | void;
+
+  onFail?: (args: {
+    page: Page;
+    scrapeChain: ScrapeChain;
+    attempts: number;
+  }) => Promise<void> | void;
+}
+
+
+
+
 export class ScrapeChain {
   private proxy?: Proxy;
   private userAgent?: string;
@@ -22,6 +46,102 @@ export class ScrapeChain {
 
 
   private pageListeners: Array<{ selector: string; callback: PageListenerCallback }> = [];
+
+
+  public async clearCache(): Promise<void> {
+    if (!this.browser || !this.page) {
+      throw new Error("clearCache() can only be called after createBrowser()");
+    }
+
+    // 1) Use the DevTools protocol to clear cookies and cache
+    const client = await this.page.target().createCDPSession();
+    try {
+      // Clear all browser cookies
+      await client.send("Network.clearBrowserCookies");
+      // Clear HTTP cache
+      await client.send("Network.clearBrowserCache");
+    } catch (err) {
+      console.warn("CDP cache‐clear commands failed:", err);
+    }
+
+    // 2) Erase localStorage & sessionStorage in the page’s context
+    try {
+      await this.page.evaluate(() => {
+        localStorage.clear();
+        sessionStorage.clear();
+      });
+    } catch (err) {
+      console.warn("Failed to clear web storage:", err);
+    }
+
+    // 3) (Optional) If you want to completely reset IndexedDB or other storage,
+    // you could do something like:
+    //
+    // await this.page.evaluate(async () => {
+    //   const databases = await indexedDB.databases();
+    //   for (const dbInfo of databases) {
+    //     indexedDB.deleteDatabase(dbInfo.name!);
+    //   }
+    // });
+    //
+    // But note: not all Chromium versions support indexedDB.databases().
+    // If you need full IndexedDB cleanup, you might spawn a new incognito context instead.
+
+    // At this point, cookies, cache, and local/session storage are cleared.
+    // If you want to “restart fresh” you can reload:
+    // await this.page.reload({ waitUntil: "networkidle2" });
+  }
+
+
+  onBlock(options: BlockOptions): this {
+    if (!this.browser || !this.page) {
+      throw new Error("onBlock() can only be called after createBrowser()");
+    }
+
+    // Default maxRetries to 3 if not provided
+    const maxRetries = options.maxRetries ?? 3;
+    let attemptCount = 0;
+
+    // Wrap the user’s onBlock so we can count attempts
+    const wrappedCallback: PageListenerCallback = async (
+      selector,
+      page,
+      htmlDoc
+    ) => {
+      attemptCount++;
+      if (attemptCount <= maxRetries) {
+        try {
+          await options.onBlock({
+            page,
+            scrapeChain: this,
+            attempts: attemptCount,
+          });
+        } catch (err) {
+          console.error("Error in onBlock callback:", err);
+        }
+      }
+
+      if (attemptCount === maxRetries) {
+        // After the last allowed attempt, fire the onFail hook
+        if (options.onFail) {
+          try {
+            await options.onFail({
+              page,
+              scrapeChain: this,
+              attempts: attemptCount,
+            });
+          } catch (err) {
+            console.error("Error in onFail callback:", err);
+          }
+        }
+      }
+    };
+
+    // Use the existing watchSelector method to detect the blocking selector
+    this.watchSelector(options.selector, wrappedCallback);
+
+    return this;
+  }
 
 
   watchSelector(selector: string, callback: PageListenerCallback, pollingInterval?: number): this {
@@ -149,7 +269,7 @@ export class ScrapeChain {
 
       // & setup interval to call
       setInterval(() => {
-          doCheck();
+        doCheck();
       }, intervalMs);
     };
 
