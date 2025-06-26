@@ -7,7 +7,6 @@ import UserAgent from 'user-agents'
 import puppeteer from 'puppeteer-core';
 import type { Page, Browser } from 'puppeteer-core';
 import * as chromeLauncher from 'chrome-launcher';
-import proxyChain from 'proxy-chain'
 
 type PageListenerCallback = (selector: string, page: Page, htmlDoc: string) => void;
 
@@ -193,11 +192,12 @@ export class ScrapeChain {
       //'--headless=new',        // run headless; remove if you want the browser UI
       //'--no-sandbox'
     ];
-
     if (this.proxy) {
-      const oldProxyUrl = this.proxy.toUrl();
-      const newProxyUrl = await proxyChain.anonymizeProxy(oldProxyUrl);
-      defaultArgs.push(`--proxy-server=${newProxyUrl}`);
+
+
+      // ignore protocol and force endpoint without http, https, etc. For now with oxylabs.
+
+      defaultArgs.push(`--proxy-server=${this.proxy.details.endpoint}:${this.proxy.details.port}`);
     }
 
     const {
@@ -225,6 +225,15 @@ export class ScrapeChain {
 
     const [page] = await browser.pages();
     if (!page) throw new Error('NO PAGE');
+
+    if (this.proxy) {
+      await page.authenticate({
+        username: this.proxy.details.username,
+        password: this.proxy.details.password
+      });
+    }
+
+
     this.browser = browser;
     this.page = page;
     return browser;

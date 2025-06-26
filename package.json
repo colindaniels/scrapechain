@@ -16,5 +16,7 @@
     "version": "changeset version",
     "release": "bun run build && changeset publish"
   },
-  "workspaces": ["packages/*"]
+  "workspaces": [
+    "packages/*"
+  ]
 }
