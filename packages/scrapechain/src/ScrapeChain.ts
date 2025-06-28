@@ -187,10 +187,6 @@ export class ScrapeChain {
   async createBrowser(launchOptions: chromeLauncher.Options = {}): Promise<Browser> {
 
     const defaultArgs: string[] = [
-      //`--disable-extensions-except=${extensionPath}`,
-      //`--load-extension=${extensionPath}`
-      //'--headless=new',        // run headless; remove if you want the browser UI
-      //'--no-sandbox'
     ];
     if (this.proxy) {
 
@@ -225,6 +221,11 @@ export class ScrapeChain {
 
     const [page] = await browser.pages();
     if (!page) throw new Error('NO PAGE');
+
+    if (this.userAgent) {
+      await page.setUserAgent(this.userAgent);
+    }
+
 
     if (this.proxy) {
       await page.authenticate({
