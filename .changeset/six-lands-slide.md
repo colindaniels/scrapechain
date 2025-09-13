@@ -1,0 +1,5 @@
+---
+"scrapechain": patch
+---
+
+dependency fix
