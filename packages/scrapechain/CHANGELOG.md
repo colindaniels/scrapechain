@@ -1,5 +1,11 @@
 # scrapechain
 
+## 0.1.5
+
+### Patch Changes
+
+- 1ec7d20: dependency fix
+
 ## 0.1.4
 
 ### Patch Changes
