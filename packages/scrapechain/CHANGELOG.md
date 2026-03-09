@@ -1,5 +1,11 @@
 # scrapechain
 
+## 0.2.0
+
+### Minor Changes
+
+- d03b41f: removed browser support for rebuild. only http support now.
+
 ## 0.1.5
 
 ### Patch Changes
