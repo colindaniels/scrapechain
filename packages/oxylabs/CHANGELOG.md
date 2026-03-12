@@ -1,5 +1,11 @@
 # @scrapechain/oxylabs
 
+## 0.3.0
+
+### Minor Changes
+
+- 612e3f5: Full datacenter API integration
+
 ## 0.2.7
 
 ### Patch Changes
