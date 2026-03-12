@@ -21,6 +21,11 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.2.4
+      - name: 📗 Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
       - name: 📦 Install dependencies
         run: bun install
       - name: Create Release / Publish
