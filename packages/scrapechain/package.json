@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@scrapechain/proxy": "*",
-    "proxy-chain": "^2.7.1",
+    "puppeteer-core": "^24.39.1",
     "wreq-js": "^2.2.0",
     "ws": "^8.19.0"
   }

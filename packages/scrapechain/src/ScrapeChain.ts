@@ -20,7 +20,7 @@ export class ScrapeChain {
     try {
       const response = await fetch(url, {
         headers: config.headers,
-        browser: 'chrome_123',
+        browser: 'chrome_142',
         os: 'macos',
         proxy: this.proxy?.toUrl(),
       });
