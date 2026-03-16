@@ -1,74 +1,52 @@
-import axios from "axios";
-import type { AxiosRequestConfig, AxiosResponse, AxiosError } from "axios";
-import { HttpsProxyAgent } from "https-proxy-agent";
 import { GenericProxy } from '@scrapechain/proxy'
 import type { Proxy } from "@scrapechain/proxy";
-import UserAgent from 'user-agents'
-
+import { fetch, type BrowserProfile } from 'wreq-js';
+import { Browser, type BrowserOptions } from './Browser';
 
 export class ScrapeChain {
   private proxy?: Proxy;
-  private userAgent?: string;
-
-
 
   setProxy(proxy: Proxy | string): this {
     if (typeof proxy === 'string') {
-      // pass into generic as string so it can convert to normal Proxy
       this.proxy = new GenericProxy(proxy)
     }
     else {
-      // can still be GenericProxy, but user has sent it in as the GenericProxy object or a vendor object
       this.proxy = proxy;
     }
     return this;
-
-  }
-  setUserAgent(userAgent: string | UserAgent): this {
-
-    if (typeof userAgent === 'string') {
-      this.userAgent = userAgent;
-    }
-    else {
-      this.userAgent = userAgent.toString();
-    }
-    return this;
   }
 
-
-
-  async scrapeHttp(url: string, config: AxiosRequestConfig = {}): Promise<string> {
-    let agent = null;
-    if (this.proxy) {
-      const proxyUrl = this.proxy.toUrl();
-      agent = new HttpsProxyAgent(proxyUrl);
-    }
-
-    // set header defaults
-    config.headers = {}
-
-    if (this.userAgent) {
-      config.headers['User-Agent'] = this.userAgent;
-    }
-
+  async scrapeHttp(url: string, config: { headers?: Record<string, string> } = {}): Promise<string> {
     try {
-      const response: AxiosResponse = await axios({
-        url: url,
-        httpAgent: agent,
-        httpsAgent: agent,
-        ...config,
+      const response = await fetch(url, {
+        headers: config.headers,
+        browser: 'chrome_123',
+        os: 'macos',
+        proxy: this.proxy?.toUrl(),
       });
-      return response.data;
 
+      if (!response.ok) {
+        throw new Error(`HTTP request failed: ${response.status} - ${response.statusText}`);
+      }
+
+      return await response.text();
     }
     catch (error) {
-      const axiosError = error as AxiosError;
-      if (axios.isAxiosError(axiosError)) {
-        const status = axiosError.response?.status;
-        throw new Error(`HTTP request failed: ${status ?? 'no response'} - ${axiosError.message}`);
+      if (error instanceof Error) {
+        throw error;
       }
-      throw error;
+      throw new Error(`HTTP request failed: ${error}`);
     }
   }
 
+  async createBrowser(options: BrowserOptions = {}): Promise<Browser> {
+    const seed = options.seed ?? Math.floor(Math.random() * 2147483647);
+    const browser = new Browser({
+      ...options,
+      resolvedSeed: seed,
+      proxy: options.proxy ?? this.proxy?.toUrl(),
+    });
+    await browser.launch();
+    return browser;
+  }
 }
