@@ -1,23 +1,23 @@
 import { launch, type LaunchedChrome } from 'chrome-launcher';
 import puppeteer, { type Browser as PuppeteerBrowser, type Page } from 'puppeteer-core';
+import { mkdirSync, rmSync } from 'fs';
 
 
 export interface BrowserOptions {
+  chromiumPath: string;
+  userDataDir: string;
   seed?: number;
   headless?: boolean;
-  chromiumPath?: string;
   debuggingPort?: number;
   screenSize?: [number, number];
   timezone?: string;
   lang?: string;
   platform?: 'windows' | 'linux' | 'macos';
   hardwareConcurrency?: number;
-  userDataDir?: string;
+  cleanUserDataDir?: boolean;
   proxy?: string;
   args?: string[];
 }
-
-const DEFAULT_CHROMIUM_PATH = '/Applications/Chromium.app/Contents/MacOS/Chromium';
 
 export class Browser {
   private chrome: LaunchedChrome | null = null;
@@ -78,10 +78,12 @@ export class Browser {
       chromeFlags.push(`--proxy-server=${proxyUrl.protocol}//${proxyUrl.host}`);
     }
 
+    mkdirSync(this.options.userDataDir, { recursive: true });
+
     this.chrome = await launch({
-      chromePath: this.options.chromiumPath ?? DEFAULT_CHROMIUM_PATH,
+      chromePath: this.options.chromiumPath,
       chromeFlags,
-      userDataDir: this.options.userDataDir ?? `/tmp/fp-${seed}`,
+      userDataDir: this.options.userDataDir,
       port: this.options.debuggingPort ?? 0,
       ignoreDefaultFlags: true,
     });
@@ -103,5 +105,8 @@ export class Browser {
   async close(): Promise<void> {
     if (this._browser) { await this._browser.close(); this._browser = null; }
     if (this.chrome) { this.chrome.kill(); this.chrome = null; }
+    if (this.options.cleanUserDataDir) {
+      rmSync(this.options.userDataDir, { recursive: true, force: true });
+    }
   }
 }

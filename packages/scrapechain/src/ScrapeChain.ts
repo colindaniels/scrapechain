@@ -39,7 +39,7 @@ export class ScrapeChain {
     }
   }
 
-  async createBrowser(options: BrowserOptions = {}): Promise<Browser> {
+  async createBrowser(options: BrowserOptions): Promise<Browser> {
     const seed = options.seed ?? Math.floor(Math.random() * 2147483647);
     const browser = new Browser({
       ...options,
