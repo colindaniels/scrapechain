@@ -1,6 +1,7 @@
 import { launch, type LaunchedChrome } from 'chrome-launcher';
 import puppeteer, { type Browser as PuppeteerBrowser, type Page } from 'puppeteer-core';
 
+
 export interface BrowserOptions {
   seed?: number;
   headless?: boolean;
@@ -42,9 +43,16 @@ export class Browser {
     return page;
   }
 
+  async getCookies(): Promise<string> {
+    const cookies = await this.browser.cookies();
+    return cookies.map(c => `${c.name}=${c.value}`).join('; ');
+  }
+
   async launch(): Promise<void> {
     const seed = this.seed;
-    const screen = this.options.screenSize ?? [1289, 807];
+    const randomX = Math.floor(Math.random() * (1300 - 1000 + 1)) + 1000;
+    const randomY = Math.floor(Math.random() * (900 - 700 + 1)) + 700;
+    const screen = this.options.screenSize ?? [randomX, randomY];
 
     const chromeFlags = [
       `--window-size=${screen[0]},${screen[1]}`,
@@ -92,8 +100,8 @@ export class Browser {
     }
   }
 
-  close(): void {
-    if (this._browser) { this._browser.disconnect(); this._browser = null; }
+  async close(): Promise<void> {
+    if (this._browser) { await this._browser.close(); this._browser = null; }
     if (this.chrome) { this.chrome.kill(); this.chrome = null; }
   }
 }
