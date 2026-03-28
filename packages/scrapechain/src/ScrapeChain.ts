@@ -1,6 +1,6 @@
 import { GenericProxy } from '@scrapechain/proxy'
 import type { Proxy } from "@scrapechain/proxy";
-import { fetch, type BrowserProfile } from 'wreq-js';
+import { fetch, Headers, type BrowserProfile, type EmulationOS } from 'wreq-js';
 import { Browser, type BrowserOptions } from './Browser';
 import { resolve, join } from 'path';
 import { tmpdir } from 'os';
@@ -40,12 +40,12 @@ export class ScrapeChain {
     return merged as BrowserOptions;
   }
 
-  async scrapeHttp(url: string, config: { headers?: Record<string, string> } = {}): Promise<string> {
+  async scrapeHttp(url: string, config: { headers?: Record<string, string>; browser?: BrowserProfile; os?: EmulationOS } = {}): Promise<{ html: string; headers: Headers }> {
     try {
       const response = await fetch(url, {
         headers: config.headers,
-        browser: 'chrome_142',
-        os: 'macos',
+        browser: config.browser ?? 'chrome_142',
+        os: config.os ?? 'macos',
         proxy: this.proxy?.toUrl(),
       });
 
@@ -53,7 +53,8 @@ export class ScrapeChain {
         throw new Error(`HTTP request failed: ${response.status} - ${response.statusText}`);
       }
 
-      return await response.text();
+      const html = await response.text();
+      return { html, headers: response.headers };
     }
     catch (error) {
       if (error instanceof Error) {

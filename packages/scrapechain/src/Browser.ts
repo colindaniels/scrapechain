@@ -23,6 +23,7 @@ export class Browser {
   private chrome: LaunchedChrome | null = null;
   private _browser: PuppeteerBrowser | null = null;
   private proxyCredentials: { username: string; password: string } | null = null;
+  private screen: [number, number] = [0, 0];
   readonly seed: number;
   port: number = 0;
   pid: number | null = null;
@@ -47,6 +48,7 @@ export class Browser {
 
   async newPage(): Promise<Page> {
     const page = await this.browser.newPage();
+    await page.setViewport({ width: this.screen[0], height: this.screen[1] });
     if (this.proxyCredentials) {
       await page.authenticate(this.proxyCredentials);
     }
@@ -62,10 +64,10 @@ export class Browser {
     const seed = this.seed;
     const randomX = Math.floor(Math.random() * (1300 - 1000 + 1)) + 1000;
     const randomY = Math.floor(Math.random() * (900 - 700 + 1)) + 700;
-    const screen = this.options.screenSize ?? [randomX, randomY];
+    this.screen = this.options.screenSize ?? [randomX, randomY];
 
     const chromeFlags = [
-      `--window-size=${screen[0]},${screen[1]}`,
+      `--window-size=${this.screen[0]},${this.screen[1]}`,
       `--fingerprint=${seed}`,
       `--fingerprint-platform=${this.options.platform ?? 'macos'}`,
       `--timezone=${this.options.timezone ?? 'America/New_York'}`,

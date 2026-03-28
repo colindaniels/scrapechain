@@ -1,57 +1,81 @@
 import { ScrapeChain } from './ScrapeChain'
 
 interface CookiePoolOptions {
+    scraper: ScrapeChain
     cookie_url: string
     cookie_selector: string
     max_pool_size?: number
-    collection_interval_ms?: number
-    cookie_life_ms?: number
-    scraper: ScrapeChain
+    randomize_fingerprint?: boolean
 }
-
-interface ResolvedCookiePoolOptions {
-    cookie_url: string
-    cookie_selector: string
-    max_pool_size: number
-    collection_interval_ms: number
-    cookie_life_ms: number
-    scraper: ScrapeChain
-}
-
 
 export class CookiePool {
-    private cookieQueue: string[] = [];
-    private currentCookie: string = '';
-    private options: ResolvedCookiePoolOptions
+    private queue: string[] = [];
+    private selected = '';
+    private filling = false;
+    private scraper: ScrapeChain;
+    private cookie_url: string;
+    private cookie_selector: string;
+    private max_pool_size: number;
+    private randomize_fingerprint: boolean;
+    private cookieReady: Promise<void>;
+    private cookieReadyResolve!: () => void;
 
     constructor(options: CookiePoolOptions) {
-        // set defaults
-        this.options = {
-            max_pool_size: 5,
-            collection_interval_ms: 1000,
-            cookie_life_ms: 1000 * 60 * 60 * 24, // one day
-            ...options
+        this.scraper = options.scraper;
+        this.cookie_url = options.cookie_url;
+        this.cookie_selector = options.cookie_selector;
+        this.max_pool_size = options.max_pool_size ?? 1;
+        this.randomize_fingerprint = options.randomize_fingerprint ?? false;
+        this.cookieReady = new Promise(resolve => { this.cookieReadyResolve = resolve });
+        this.fill();
+    }
+
+    async getCookie(): Promise<string> {
+        await this.cookieReady;
+        return this.selected;
+    }
+
+    releaseCookie(cookie: string) {
+        // already rotated by another caller — ignore
+        if (cookie !== this.selected) return;
+
+        const next = this.queue.shift();
+        if (next) {
+            this.selected = next;
+            console.log(`[CookiePool] rotated cookie, ${this.queue.length}/${this.max_pool_size} in queue`)
+            this.fill();
+        } else {
+            // queue empty — wait for fill to produce one
+            this.selected = '';
+            this.cookieReady = new Promise(resolve => { this.cookieReadyResolve = resolve });
+            this.fill();
+            console.log('[CookiePool] queue empty, waiting for new cookie...')
         }
-        this.init()
     }
 
-    async init() {
-        console.log(`cookie pool initializing. Gathering ${this.options.max_pool_size} cookies...`)
-        while (this.cookieQueue.length < this.options.max_pool_size) {
-            console.log('[Opening Browser...]')
-            const cookie = await this.options.scraper.crawlForCookies(this.options.cookie_url, this.options.cookie_selector)
-            this.cookieQueue.push(cookie);
-            console.log('[Cookie Obtained]')
+    private async fill() {
+        if (this.filling) return;
+        this.filling = true;
+        try {
+            while (this.queue.length < this.max_pool_size || !this.selected) {
+                console.log(`[CookiePool] obtaining cookie... (queue: ${this.queue.length}/${this.max_pool_size})`)
+                const seed = this.randomize_fingerprint ? Math.floor(Math.random() * 2147483647) : undefined;
+                const cookie = await this.scraper.crawlForCookies(this.cookie_url, this.cookie_selector, { seed });
+
+                if (!this.selected) {
+                    this.selected = cookie;
+                    this.cookieReadyResolve();
+                    console.log('[CookiePool] selected cookie set')
+                } else {
+                    this.queue.push(cookie);
+                    console.log(`[CookiePool] cookie added to queue (${this.queue.length}/${this.max_pool_size})`)
+                }
+            }
+            console.log(`[CookiePool] pool full (${this.queue.length}/${this.max_pool_size})`)
+        } catch (err) {
+            console.log('[CookiePool] error obtaining cookie:', err)
+        } finally {
+            this.filling = false;
         }
-        this.currentCookie = 
     }
-
-    async aquireCookie() {
-        
-    }
-
-    async releaseCookie() {
-
-    }
-
 }
