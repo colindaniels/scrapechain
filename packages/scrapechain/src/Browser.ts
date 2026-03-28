@@ -1,6 +1,7 @@
 import { launch, type LaunchedChrome } from 'chrome-launcher';
 import puppeteer, { type Browser as PuppeteerBrowser, type Page } from 'puppeteer-core';
 import { mkdirSync, rmSync } from 'fs';
+import { execSync } from 'child_process';
 
 
 export interface BrowserOptions {
@@ -14,7 +15,6 @@ export interface BrowserOptions {
   lang?: string;
   platform?: 'windows' | 'linux' | 'macos';
   hardwareConcurrency?: number;
-  cleanUserDataDir?: boolean;
   proxy?: string;
   args?: string[];
 }
@@ -25,6 +25,16 @@ export class Browser {
   private proxyCredentials: { username: string; password: string } | null = null;
   readonly seed: number;
   port: number = 0;
+  pid: number | null = null;
+
+  /** Kill all running processes matching a chromiumPath */
+  static killAll(chromiumPath: string): void {
+    try {
+      execSync(`pkill -f "${chromiumPath}"`, { stdio: 'ignore' });
+    } catch {
+      // no matching processes — that's fine
+    }
+  }
 
   constructor(private options: BrowserOptions & { resolvedSeed: number }) {
     this.seed = options.resolvedSeed;
@@ -89,6 +99,7 @@ export class Browser {
     });
 
     this.port = this.chrome.port;
+    this.pid = this.chrome.pid;
 
     this._browser = await puppeteer.connect({
       browserURL: `http://127.0.0.1:${this.port}`,
@@ -103,10 +114,22 @@ export class Browser {
   }
 
   async close(): Promise<void> {
-    if (this._browser) { await this._browser.close(); this._browser = null; }
-    if (this.chrome) { this.chrome.kill(); this.chrome = null; }
-    if (this.options.cleanUserDataDir) {
-      rmSync(this.options.userDataDir, { recursive: true, force: true });
+    if (this._browser) {
+      try { await this._browser.close(); } catch { }
+      this._browser = null;
     }
+    if (this.chrome) {
+      this.chrome.kill();
+      this.chrome = null;
+    }
+    // ensure the process tree is dead
+    if (this.pid) {
+      try { process.kill(-this.pid, 'SIGKILL'); } catch { }
+      this.pid = null;
+    }
+  }
+
+  cleanUserDataDir(): void {
+    rmSync(this.options.userDataDir, { recursive: true, force: true });
   }
 }
