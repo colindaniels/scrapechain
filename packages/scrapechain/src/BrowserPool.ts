@@ -33,6 +33,9 @@ export class BrowserPool<TArgs extends any[] = any[], TReturn = any> {
         this.maxPagesPerBrowser = options.maxPagesPerBrowser ?? 10
         this.maxBrowsers = options.maxBrowsers
         this.proxies = options.proxies
+        if (this.proxies && this.maxBrowsers > this.proxies.length) {
+            throw new Error(`maxBrowsers (${this.maxBrowsers}) exceeds available proxies (${this.proxies.length})`)
+        }
         this.ready = this.launch()
     }
 
