@@ -26,6 +26,10 @@ export class ScrapeChain {
     return this;
   }
 
+  getBrowserDefaults(): Partial<BrowserOptions> {
+    return this.browserDefaults;
+  }
+
   rotateBrowserFingerprint(): this {
     this.seed = Math.floor(Math.random() * 2147483647);
     return this;
@@ -74,6 +78,21 @@ export class ScrapeChain {
     });
     await browser.launch();
     return browser;
+  }
+
+  async crawlForHtml(url: string, selector: string, overrides?: Partial<BrowserOptions>): Promise<string> {
+    const seed = overrides?.seed ?? this.seed;
+    const tempProfile = join(tmpdir(), `scrapechain-${seed}-${Date.now()}`);
+    const browser = await this.createBrowser({ ...overrides, userDataDir: overrides?.userDataDir ?? tempProfile });
+    try {
+      const page = await browser.newPage();
+      await page.goto(url);
+      await page.waitForSelector(selector);
+      return await page.content();
+    } finally {
+      await browser.close();
+      browser.cleanUserDataDir();
+    }
   }
 
   async crawlForCookies(url: string, selector: string, overrides?: Partial<BrowserOptions>): Promise<string> {

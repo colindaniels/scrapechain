@@ -1,4 +1,3 @@
-import { launch, type LaunchedChrome } from 'chrome-launcher';
 import puppeteer, { type Browser as PuppeteerBrowser, type Page } from 'puppeteer-core';
 import { mkdirSync, rmSync } from 'fs';
 import { execSync } from 'child_process';
@@ -20,10 +19,10 @@ export interface BrowserOptions {
 }
 
 export class Browser {
-  private chrome: LaunchedChrome | null = null;
   private _browser: PuppeteerBrowser | null = null;
   private proxyCredentials: { username: string; password: string } | null = null;
   private screen: [number, number] = [0, 0];
+  private exitHandler: (() => void) | null = null;
   readonly seed: number;
   port: number = 0;
   pid: number | null = null;
@@ -73,9 +72,10 @@ export class Browser {
       `--timezone=${this.options.timezone ?? 'America/New_York'}`,
       `--lang=${this.options.lang ?? 'en-US'}`,
       `--accept-lang=${this.options.lang ?? 'en-US'},en`,
+      `--no-first-run`,
+      `--no-default-browser-check`,
     ];
 
-    if (this.options.headless !== false) chromeFlags.push('--headless=new');
     if (this.options.hardwareConcurrency) chromeFlags.push(`--fingerprint-hardware-concurrency=${this.options.hardwareConcurrency}`);
     if (this.options.args) chromeFlags.push(...this.options.args);
 
@@ -92,37 +92,43 @@ export class Browser {
 
     mkdirSync(this.options.userDataDir, { recursive: true });
 
-    this.chrome = await launch({
-      chromePath: this.options.chromiumPath,
-      chromeFlags,
-      userDataDir: this.options.userDataDir,
-      port: this.options.debuggingPort ?? 0,
-      ignoreDefaultFlags: true,
-    });
+    try {
+      this._browser = await puppeteer.launch({
+        executablePath: this.options.chromiumPath,
+        args: chromeFlags,
+        userDataDir: this.options.userDataDir,
+        headless: this.options.headless !== false,
+      });
 
-    this.port = this.chrome.port;
-    this.pid = this.chrome.pid;
+      const proc = this._browser.process();
+      this.pid = proc?.pid ?? null;
 
-    this._browser = await puppeteer.connect({
-      browserURL: `http://127.0.0.1:${this.port}`,
-    });
-
-    // Authenticate any existing pages
-    if (this.proxyCredentials) {
-      for (const page of await this._browser.pages()) {
-        await page.authenticate(this.proxyCredentials);
+      // Authenticate any existing pages
+      if (this.proxyCredentials) {
+        for (const page of await this._browser.pages()) {
+          await page.authenticate(this.proxyCredentials);
+        }
       }
+      this.exitHandler = () => {
+        if (this.pid) try { process.kill(-this.pid, 'SIGKILL'); } catch {}
+        this.cleanUserDataDir();
+      };
+      process.on('exit', this.exitHandler);
+    } catch (err) {
+      await this.close();
+      this.cleanUserDataDir();
+      throw err;
     }
   }
 
   async close(): Promise<void> {
+    if (this.exitHandler) {
+      process.removeListener('exit', this.exitHandler);
+      this.exitHandler = null;
+    }
     if (this._browser) {
       try { await this._browser.close(); } catch { }
       this._browser = null;
-    }
-    if (this.chrome) {
-      this.chrome.kill();
-      this.chrome = null;
     }
     // ensure the process tree is dead
     if (this.pid) {

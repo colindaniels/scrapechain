@@ -24,7 +24,7 @@ export class CookiePool {
         this.scraper = options.scraper;
         this.cookie_url = options.cookie_url;
         this.cookie_selector = options.cookie_selector;
-        this.max_pool_size = options.max_pool_size ?? 1;
+        this.max_pool_size = options.max_pool_size ?? 5;
         this.randomize_fingerprint = options.randomize_fingerprint ?? false;
         this.cookieReady = new Promise(resolve => { this.cookieReadyResolve = resolve });
         this.fill();
