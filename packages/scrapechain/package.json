@@ -12,11 +12,6 @@
     "clean": "rm -rf dist",
     "lint": "tsc --build tsconfig.json"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/colindaniels/scrapechain",
-    "directory": "packages/scrapechain"
-  },
   "publishConfig": {
     "access": "public"
   },
