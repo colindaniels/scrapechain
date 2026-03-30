@@ -1,5 +1,11 @@
 # scrapechain
 
+## 0.3.0
+
+### Minor Changes
+
+- 8c0679b: Scrapechain - better browser support. Oxylabs - datacenter integration.
+
 ## 0.2.0
 
 ### Minor Changes
