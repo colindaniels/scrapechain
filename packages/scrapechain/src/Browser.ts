@@ -72,8 +72,6 @@ export class Browser {
       `--timezone=${this.options.timezone ?? 'America/New_York'}`,
       `--lang=${this.options.lang ?? 'en-US'}`,
       `--accept-lang=${this.options.lang ?? 'en-US'},en`,
-      `--no-first-run`,
-      `--no-default-browser-check`,
     ];
 
     if (this.options.hardwareConcurrency) chromeFlags.push(`--fingerprint-hardware-concurrency=${this.options.hardwareConcurrency}`);
