@@ -1,3 +1,3 @@
 export { ScrapeChain } from './ScrapeChain';
-
-export { default as UserAgent } from 'user-agents';
+export { Browser, type BrowserOptions } from './Browser';
+export type { Page } from 'puppeteer-core';

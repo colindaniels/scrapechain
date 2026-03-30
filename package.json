@@ -18,6 +18,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "chrome-launcher": "^1.2.1",
     "user-agents": "^1.1.553"
   }
 }
