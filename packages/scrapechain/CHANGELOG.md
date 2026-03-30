@@ -1,5 +1,11 @@
 # scrapechain
 
+## 0.3.1
+
+### Patch Changes
+
+- f749570: adds repo in package.json
+
 ## 0.3.0
 
 ### Minor Changes
