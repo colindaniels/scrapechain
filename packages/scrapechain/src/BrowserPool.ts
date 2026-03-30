@@ -8,12 +8,14 @@ interface BrowserPoolOptions<TArgs extends any[], TReturn> {
     handler: (page: Page, ...args: TArgs) => Promise<TReturn>
     maxPagesPerBrowser?: number
     maxBrowsers: number
+    maxRequestsPerHour?: number
     proxies?: Proxy[]
 }
 
 interface BrowserEntry {
     browser: Browser
     pageCount: number
+    requestTimestamps: number[]
 }
 
 export class BrowserPool<TArgs extends any[] = any[], TReturn = any> {
@@ -24,6 +26,7 @@ export class BrowserPool<TArgs extends any[] = any[], TReturn = any> {
     private handler: (page: Page, ...args: TArgs) => Promise<TReturn>
     private maxPagesPerBrowser: number
     private maxBrowsers: number
+    private maxRequestsPerHour: number
     private proxies?: Proxy[]
     ready: Promise<void>
 
@@ -32,6 +35,7 @@ export class BrowserPool<TArgs extends any[] = any[], TReturn = any> {
         this.handler = options.handler
         this.maxPagesPerBrowser = options.maxPagesPerBrowser ?? 10
         this.maxBrowsers = options.maxBrowsers
+        this.maxRequestsPerHour = options.maxRequestsPerHour ?? Infinity
         this.proxies = options.proxies
         if (this.proxies && this.maxBrowsers > this.proxies.length) {
             throw new Error(`maxBrowsers (${this.maxBrowsers}) exceeds available proxies (${this.proxies.length})`)
@@ -46,32 +50,56 @@ export class BrowserPool<TArgs extends any[] = any[], TReturn = any> {
             const proxy = this.proxies?.[i]?.toUrl()
             const browser = await this.scraper.createBrowser({
                 seed,
-                userDataDir: `${defaults.userDataDir ?? './chrome-data'}-${i}`,
+                userDataDir: `${defaults.userDataDir ?? './chrome-data'}/${i}`,
                 proxy,
             })
-            this.entries.push({ browser, pageCount: 0 })
+            this.entries.push({ browser, pageCount: 0, requestTimestamps: [] })
             console.log(`[BrowserPool] browser ${i} ready (seed: ${seed})`)
         })
         await Promise.all(launches)
         console.log(`[BrowserPool] all ${this.maxBrowsers} browsers ready`)
     }
 
+    private requestsInLastHour(entry: BrowserEntry): number {
+        const oneHourAgo = Date.now() - 3_600_000
+        entry.requestTimestamps = entry.requestTimestamps.filter(t => t > oneHourAgo)
+        return entry.requestTimestamps.length
+    }
+
     private async acquirePage(): Promise<Page> {
         while (true) {
-            const entry = this.entries.find(e => e.pageCount < this.maxPagesPerBrowser)
+            const entry = this.entries.find(e =>
+                e.pageCount < this.maxPagesPerBrowser &&
+                this.requestsInLastHour(e) < this.maxRequestsPerHour
+            )
             if (entry) {
                 entry.pageCount++
+                entry.requestTimestamps.push(Date.now())
                 try {
                     const page = await entry.browser.newPage()
                     this.pageMap.set(page, entry)
                     return page
                 } catch (err) {
                     entry.pageCount--
+                    entry.requestTimestamps.pop()
                     throw err
                 }
             }
 
-            // all browsers full — wait for a slot
+            // check if any browser is just rate limited (not page-full)
+            const rateLimited = this.entries.every(e =>
+                this.requestsInLastHour(e) >= this.maxRequestsPerHour
+            )
+            if (rateLimited) {
+                // find when the earliest request expires
+                const earliest = Math.min(...this.entries.map(e => e.requestTimestamps[0] ?? Date.now()))
+                const waitMs = earliest + 3_600_000 - Date.now() + 100
+                console.log(`[BrowserPool] all browsers rate limited, waiting ${Math.ceil(waitMs / 1000)}s`)
+                await new Promise(resolve => setTimeout(resolve, waitMs))
+                continue
+            }
+
+            // all browsers page-full — wait for a slot
             await new Promise<void>(resolve => { this.waiters.push(resolve) })
         }
     }
@@ -112,6 +140,11 @@ export class BrowserPool<TArgs extends any[] = any[], TReturn = any> {
             browsers: this.entries.length,
             totalPages: this.entries.reduce((sum, e) => sum + e.pageCount, 0),
             waiting: this.waiters.length,
+            requestsPerBrowser: this.entries.map((e, i) => ({
+                browser: i,
+                requestsThisHour: this.requestsInLastHour(e),
+                limit: this.maxRequestsPerHour,
+            })),
         }
     }
 }
