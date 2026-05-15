@@ -16,12 +16,16 @@
     "access": "public"
   },
   "devDependencies": {
+    "@types/chrome-remote-interface": "^0.33.0",
     "@types/ws": "^8.18.1",
     "tsup": "^8.5.0",
     "typescript": "^5"
   },
   "dependencies": {
     "@scrapechain/proxy": "*",
+    "chrome-launcher": "^1.2.1",
+    "chrome-remote-interface": "^0.34.0",
+    "proxy-chain": "^2.7.1",
     "puppeteer-core": "^24.39.1",
     "wreq-js": "^2.2.0",
     "ws": "^8.19.0"
