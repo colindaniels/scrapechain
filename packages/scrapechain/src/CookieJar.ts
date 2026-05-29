@@ -51,18 +51,25 @@ export class CookieJar {
 
     private async startGatheringCookies() {
         while (true) {
+            if (!this.currentCookie && this.cookieJar.length > 0) {
+                this.aquireCookie();
+            }
             if (this.cookieJar.length < this.options.size) {
                 this.cookieJar.push(await this.produceCookie());
             }
             await new Promise(r => setTimeout(r, 1000));
-            console.log(this.cookieJar.length)
         }
     }
 
-    private async waitForAnyCookie(maxPolls?: number): Promise<void> {
+    private aquireCookie() {
+        const cookie = this.cookieJar.shift();
+        if (cookie) this.currentCookie = cookie;
+    }
+
+    private async waitForCurrentCookie(maxPolls?: number): Promise<void> {
         if (maxPolls === undefined) maxPolls = Infinity;
         let currentPoll = 0;
-        while (this.cookieJar.length < 1 && currentPoll < maxPolls) {
+        while (!this.currentCookie && currentPoll < maxPolls) {
             await new Promise(r => setTimeout(r, 500));
             currentPoll++;
         }
@@ -71,13 +78,16 @@ export class CookieJar {
 
     async initCookieJar(): Promise<void> {
         this.startGatheringCookies();
-
-        await this.waitForAnyCookie();
+        await this.waitForCurrentCookie();
         return;
     }
 
-    async aquireCookie() {
-        await this.waitForAnyCookie();
-        return this.cookieJar.shift();
+    async getCookie(): Promise<string> {
+        await this.waitForCurrentCookie();
+        return this.currentCookie;
+    }
+
+    releaseCookie() {
+        this.currentCookie = '';
     }
 }
