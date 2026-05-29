@@ -1,93 +1,162 @@
 import { Browser, BrowserOptions } from 'scrapechain'
 import { Proxy } from '@scrapechain/proxy'
 
-
-
-
 type FetchCookie = (browser: Browser, url: string) => Promise<string>;
 
 interface CookieJarOptions {
-    size: number;
+    proxies: Proxy[];
     url: string;
     browserOptions: BrowserOptions;
-    proxy?: Proxy;
     fetchCookie: FetchCookie;
+    acquireTimeoutMs?: number;
+    refillBackoffMs?: number;
 }
 
-export class CookieJar {
+export interface CookieHandle {
+    cookie: string;
+    proxy: Proxy;
+    release: (opts?: { dead?: boolean }) => void;
+}
 
+type SlotState = 'idle' | 'in_use' | 'refilling' | 'cooling_down';
+
+class Slot {
+    readonly proxy: Proxy;
+    cookie: string | null = null;
+    state: SlotState = 'refilling';
+    constructor(proxy: Proxy) {
+        this.proxy = proxy;
+    }
+}
+
+type Waiter = (slot: Slot) => void;
+
+const DEFAULT_ACQUIRE_TIMEOUT_MS = 30_000;
+const DEFAULT_REFILL_BACKOFF_MS = 120_000;
+
+export class CookieJar {
     private options: CookieJarOptions;
-    private cookieJar: string[] = [];
-    private currentCookie: string = '';
+    private slots: Slot[];
+    private waiters: Waiter[] = [];
 
     constructor(options: CookieJarOptions) {
+        if (!options.proxies.length) {
+            throw new Error('CookieJar requires at least one proxy in `proxies`');
+        }
         this.options = options;
+        this.slots = options.proxies.map(p => new Slot(p));
     }
 
-    randomString() {
+    private randomString(): string {
         return Math.random().toString(36).slice(2, 12);
     }
 
-
-    launchBrowser() {
-        const browserOptions = this.options.browserOptions;
+    private async launchBrowser(proxy: Proxy): Promise<Browser> {
+        const bo = this.options.browserOptions;
         return Browser.launch({
-            ...browserOptions,
-            user_data_dir: browserOptions.user_data_dir ?? `./chrome-data-${this.randomString()}`,
-            headless: browserOptions.headless ?? true,
-            proxy: browserOptions.proxy ?? undefined,
-        })
+            ...bo,
+            user_data_dir: `${bo.user_data_dir ?? './chrome-data'}-${this.randomString()}`,
+            headless: bo.headless ?? true,
+            proxy,
+        });
     }
 
-
-    private async produceCookie(): Promise<string> {
-        const browser = await this.launchBrowser();
-        try {
-            return await this.options.fetchCookie(browser, this.options.url);
-        } finally {
-            await browser.close();
-        }
-    }
-
-    private async startGatheringCookies() {
+    /** Refill loops until success. Failures back off for `refillBackoffMs` and retry. */
+    private async refill(slot: Slot): Promise<void> {
+        const backoff = this.options.refillBackoffMs ?? DEFAULT_REFILL_BACKOFF_MS;
         while (true) {
-            if (!this.currentCookie && this.cookieJar.length > 0) {
-                this.aquireCookie();
+            slot.state = 'refilling';
+            try {
+                const browser = await this.launchBrowser(slot.proxy);
+                let cookie: string;
+                try {
+                    cookie = await this.options.fetchCookie(browser, this.options.url);
+                } finally {
+                    await browser.close().catch(() => {});
+                }
+                if (!cookie) throw new Error('fetchCookie returned empty cookie');
+                slot.cookie = cookie;
+                slot.state = 'idle';
+                this.dispatchWaiters();
+                return;
+            } catch (err) {
+                slot.cookie = null;
+                slot.state = 'cooling_down';
+                await new Promise(r => setTimeout(r, backoff));
             }
-            if (this.cookieJar.length < this.options.size) {
-                this.cookieJar.push(await this.produceCookie());
-            }
-            await new Promise(r => setTimeout(r, 1000));
         }
     }
 
-    private aquireCookie() {
-        const cookie = this.cookieJar.shift();
-        if (cookie) this.currentCookie = cookie;
-    }
-
-    private async waitForCurrentCookie(maxPolls?: number): Promise<void> {
-        if (maxPolls === undefined) maxPolls = Infinity;
-        let currentPoll = 0;
-        while (!this.currentCookie && currentPoll < maxPolls) {
-            await new Promise(r => setTimeout(r, 500));
-            currentPoll++;
+    private findIdleSlot(): Slot | null {
+        for (const s of this.slots) {
+            if (s.state === 'idle' && s.cookie) return s;
         }
-        return;
+        return null;
     }
 
+    /** Hand off any idle slots to waiting acquirers (FIFO). */
+    private dispatchWaiters(): void {
+        while (this.waiters.length > 0) {
+            const slot = this.findIdleSlot();
+            if (!slot) return;
+            slot.state = 'in_use';
+            const waiter = this.waiters.shift()!;
+            waiter(slot);
+        }
+    }
+
+    private toHandle(slot: Slot): CookieHandle {
+        const cookie = slot.cookie!;
+        const proxy = slot.proxy;
+        let released = false;
+        return {
+            cookie,
+            proxy,
+            release: ({ dead = false } = {}) => {
+                if (released) return;
+                released = true;
+                this.releaseSlot(slot, dead);
+            },
+        };
+    }
+
+    private releaseSlot(slot: Slot, dead: boolean): void {
+        if (slot.state !== 'in_use') return;
+        if (dead) {
+            slot.cookie = null;
+            slot.state = 'refilling';
+            this.refill(slot).catch(() => {});
+        } else {
+            slot.state = 'idle';
+            this.dispatchWaiters();
+        }
+    }
+
+    /** Kick off refills for every slot concurrently. Resolves when the first slot is ready. */
     async initCookieJar(): Promise<void> {
-        this.startGatheringCookies();
-        await this.waitForCurrentCookie();
-        return;
+        const firstReady = this.slots.map(slot => this.refill(slot));
+        await Promise.any(firstReady);
     }
 
-    async getCookie(): Promise<string> {
-        await this.waitForCurrentCookie();
-        return this.currentCookie;
-    }
-
-    releaseCookie() {
-        this.currentCookie = '';
+    /** Acquire an `(ip, cookie)` pair. Throws if no slot becomes available within `acquireTimeoutMs`. */
+    async acquire(): Promise<CookieHandle> {
+        const idle = this.findIdleSlot();
+        if (idle) {
+            idle.state = 'in_use';
+            return this.toHandle(idle);
+        }
+        const timeoutMs = this.options.acquireTimeoutMs ?? DEFAULT_ACQUIRE_TIMEOUT_MS;
+        return new Promise<CookieHandle>((resolve, reject) => {
+            const onSlot: Waiter = (slot) => {
+                clearTimeout(timer);
+                resolve(this.toHandle(slot));
+            };
+            const timer = setTimeout(() => {
+                const i = this.waiters.indexOf(onSlot);
+                if (i >= 0) this.waiters.splice(i, 1);
+                reject(new Error(`CookieJar.acquire: timed out after ${timeoutMs}ms — no slots available`));
+            }, timeoutMs);
+            this.waiters.push(onSlot);
+        });
     }
 }
