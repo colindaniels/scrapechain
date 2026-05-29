@@ -8,10 +8,11 @@ import { EventEmitter } from 'node:events';
 import CDP from 'chrome-remote-interface';
 import type Protocol from 'devtools-protocol';
 import { anonymizeProxy, closeAnonymizedProxy } from './localProxy'
+import { Page } from './Page';
 
 type CDPClient = Awaited<ReturnType<typeof CDP>> & EventEmitter;
 
-interface BrowserOptions {
+export interface BrowserOptions {
     chrome_path: string;
     user_data_dir: string;
     fingerprint?: number;
@@ -24,8 +25,11 @@ interface BrowserOptions {
     lang?: string;
     accept_lang?: string;
     timezone?: string;
-    proxy_server?: Proxy;
+    proxy?: Proxy;
     disable_spoofing?: string[];
+    headless?: boolean;
+    window_width?: number;
+    window_height?: number;
 }
 
 export class Browser {
@@ -33,57 +37,57 @@ export class Browser {
     private browserOptions: BrowserOptions
     private localProxy?: string;
     private cdp: CDPClient;
+    readonly page: Page;
+    private extraPages = new Set<Page>();
 
-    private constructor(chrome: LaunchedChrome, browserOptions: BrowserOptions, cdp: CDPClient, localProxy?: string) {
+    private constructor(chrome: LaunchedChrome, browserOptions: BrowserOptions, cdp: CDPClient, page: Page, localProxy?: string) {
         this.chrome = chrome;
         this.browserOptions = browserOptions;
         this.cdp = cdp;
+        this.page = page;
         this.localProxy = localProxy;
     }
 
-    async goto(url: string) {
-        return this.cdp.send('Page.navigate', { url });
+    async newPage(): Promise<Page> {
+        const { targetId } = await this.cdp.send('Target.createTarget', { url: 'about:blank' });
+        const cdp = await CDP({
+            port: this.chrome.port,
+            target: (targets: any[]) => {
+                const t = targets.find(x => x.id === targetId);
+                if (!t) throw new Error(`target ${targetId} not found`);
+                return t;
+            },
+        }) as CDPClient;
+
+        const page: Page = await Page.create(cdp, targetId, async () => {
+            try {
+                await this.cdp.send('Target.closeTarget', { targetId });
+            } catch { /* target may already be gone */ }
+            try {
+                await cdp.close();
+            } catch { /* ws may already be closed */ }
+            this.extraPages.delete(page);
+        });
+
+        this.extraPages.add(page);
+        return page;
     }
 
-    async waitForNetworkIdle(idleTime = 3000, timeout = 30000): Promise<boolean> {
-        const pending = new Set<string>();
+    pages(): Page[] {
+        return [this.page, ...this.extraPages];
+    }
 
-        return new Promise<boolean>((resolve) => {
-            let idleTimer: NodeJS.Timeout | undefined;
+    async setCookies(cookies: Protocol.Network.CookieParam[]): Promise<void> {
+        await this.cdp.send('Storage.setCookies', { cookies });
+    }
 
-            const finish = (idle: boolean) => {
-                clearTimeout(idleTimer);
-                clearTimeout(timeoutTimer);
-                this.cdp.off('Network.requestWillBeSent', onRequest);
-                this.cdp.off('Network.loadingFinished', onEnd);
-                this.cdp.off('Network.loadingFailed', onEnd);
-                resolve(idle);
-            };
+    async getCookies(): Promise<Protocol.Network.Cookie[]> {
+        const { cookies } = await this.cdp.send('Storage.getCookies');
+        return cookies;
+    }
 
-            const armIdle = () => {
-                clearTimeout(idleTimer);
-                if (pending.size === 0) {
-                    idleTimer = setTimeout(() => finish(true), idleTime);
-                }
-            };
-
-            const onRequest = (p: Protocol.Network.RequestWillBeSentEvent) => {
-                pending.add(p.requestId);
-                clearTimeout(idleTimer);
-            };
-
-            const onEnd = (p: { requestId: string }) => {
-                if (pending.delete(p.requestId)) armIdle();
-            };
-
-            const timeoutTimer = setTimeout(() => finish(false), timeout);
-
-            this.cdp.on('Network.requestWillBeSent', onRequest);
-            this.cdp.on('Network.loadingFinished', onEnd);
-            this.cdp.on('Network.loadingFailed', onEnd);
-
-            armIdle();
-        });
+    async clearCookies(): Promise<void> {
+        await this.cdp.send('Storage.clearCookies');
     }
 
     // only entry to the class instance should be launch()
@@ -94,22 +98,55 @@ export class Browser {
         const chromeFlags: string[] = [];
 
         let localProxy: string = '';
-        if (browserOptions.proxy_server) {
-            localProxy = await anonymizeProxy(browserOptions.proxy_server.toUrl());
+        if (browserOptions.proxy) {
+            localProxy = await anonymizeProxy(browserOptions.proxy.toUrl());
             chromeFlags.push(`--proxy-server=${localProxy}`);
         }
 
-        const fingerprint = Math.floor(10000000 + Math.random() * 90000000);
-        chromeFlags.push(`--fingerprint=${fingerprint}`);
-
-        chromeFlags.push('--fingerprint-brand=Chrome');
-
         const randInt = (min: number, max: number) => Math.floor(min + Math.random() * (max - min + 1));
 
-        const windowWidth  = randInt(800, 1400);
-        const windowHeight = randInt(500, 830);
+        browserOptions.fingerprint ??= Math.floor(10000000 + Math.random() * 90000000);
+        browserOptions.fingerprint_brand ??= 'Chrome';
+        browserOptions.window_width ??= randInt(800, 1400);
+        browserOptions.window_height ??= randInt(500, 830);
 
-        chromeFlags.push(`--window-size=${windowWidth},${windowHeight}`)
+        chromeFlags.push(`--fingerprint=${browserOptions.fingerprint}`);
+        chromeFlags.push(`--fingerprint-brand=${browserOptions.fingerprint_brand}`);
+        chromeFlags.push(`--window-size=${browserOptions.window_width},${browserOptions.window_height}`);
+
+        if (browserOptions.fingerprint_platform) {
+            chromeFlags.push(`--fingerprint-platform=${browserOptions.fingerprint_platform}`);
+        }
+        if (browserOptions.fingerprint_platform_version) {
+            chromeFlags.push(`--fingerprint-platform-version=${browserOptions.fingerprint_platform_version}`);
+        }
+        if (browserOptions.fingerprint_brand_version) {
+            chromeFlags.push(`--fingerprint-brand-version=${browserOptions.fingerprint_brand_version}`);
+        }
+        if (browserOptions.fingerprint_hardware_concurrency !== undefined) {
+            chromeFlags.push(`--fingerprint-hardware-concurrency=${browserOptions.fingerprint_hardware_concurrency}`);
+        }
+        if (browserOptions.disable_non_proxied_udp) {
+            chromeFlags.push('--disable-non-proxied-udp');
+        }
+        if (browserOptions.lang) {
+            chromeFlags.push(`--lang=${browserOptions.lang}`);
+        }
+        if (browserOptions.accept_lang) {
+            chromeFlags.push(`--accept-lang=${browserOptions.accept_lang}`);
+        }
+        if (browserOptions.timezone) {
+            chromeFlags.push(`--timezone=${browserOptions.timezone}`);
+        }
+        if (browserOptions.disable_spoofing && browserOptions.disable_spoofing.length > 0) {
+            chromeFlags.push(`--disable-spoofing=${browserOptions.disable_spoofing.join(',')}`);
+        }
+
+        if (browserOptions.headless) {
+            chromeFlags.push('--headless=new');
+        }
+
+        chromeFlags.push('--disable-web-security')
 
         mkdirSync(browserOptions.user_data_dir, { recursive: true });
 
@@ -120,17 +157,58 @@ export class Browser {
         });
 
         const cdp = await CDP({ port: chrome.port }) as CDPClient;
-        await cdp.send('Page.enable');
-        await cdp.send('Network.enable');
+        const page = await Page.create(cdp);
 
-        return new Browser(chrome, browserOptions, cdp, localProxy);
+        return new Browser(chrome, browserOptions, cdp, page, localProxy);
     }
 
     async close() {
+        for (const page of [...this.extraPages]) {
+            try { await page.close(); } catch { /* ignore */ }
+        }
         await this.cdp.close();
         this.chrome.kill();
         if (this.localProxy) await closeAnonymizedProxy(this.localProxy, true);
         await rm(this.browserOptions.user_data_dir, { recursive: true, force: true });
     }
 
+    getFingerprint() {
+        return this.browserOptions;
+    }
+
+    getWindowSize(): { width: number; height: number } {
+        return {
+            width: this.browserOptions.window_width!,
+            height: this.browserOptions.window_height!,
+        };
+    }
+
+    async getImpersonatedIdentity(): Promise<{
+        userAgent: string;
+        platform: string;
+        hardwareConcurrency: number;
+        deviceMemory: number | undefined;
+        languages: readonly string[];
+        webglVendor: string | null;
+        webglRenderer: string | null;
+    }> {
+        const expression = `JSON.stringify((() => {
+            const gl = document.createElement('canvas').getContext('webgl');
+            const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
+            return {
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                hardwareConcurrency: navigator.hardwareConcurrency,
+                deviceMemory: navigator.deviceMemory,
+                languages: navigator.languages,
+                webglVendor: ext ? gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) : null,
+                webglRenderer: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : null,
+            };
+        })())`;
+        const { result } = await this.cdp.send('Runtime.evaluate', {
+            expression,
+            returnByValue: true,
+        });
+        return JSON.parse(result.value);
+    }
 }
