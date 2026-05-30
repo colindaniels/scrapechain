@@ -30,6 +30,7 @@ export interface BrowserOptions {
     headless?: boolean;
     window_width?: number;
     window_height?: number;
+    extra_flags?: string[];
 }
 
 export class Browser {
@@ -147,6 +148,10 @@ export class Browser {
         }
 
         chromeFlags.push('--disable-web-security')
+
+        if (browserOptions.extra_flags && browserOptions.extra_flags.length > 0) {
+            chromeFlags.push(...browserOptions.extra_flags);
+        }
 
         mkdirSync(browserOptions.user_data_dir, { recursive: true });
 

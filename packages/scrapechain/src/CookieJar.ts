@@ -106,6 +106,7 @@ export class CookieJar {
             } catch (err) {
                 slot.cookie = null;
                 slot.state = 'cooling_down';
+                console.error(`[CookieJar] refill failed on port ${(slot.proxy as any).options?.port ?? '?'}:`, err);
             } finally {
                 this.releaseLaunchSlot();
             }
