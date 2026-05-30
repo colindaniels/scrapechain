@@ -10,6 +10,7 @@ interface CookieJarOptions {
     fetchCookie: FetchCookie;
     acquireTimeoutMs?: number;
     refillBackoffMs?: number;
+    maxConcurrentRefills?: number;
 }
 
 export interface CookieHandle {
@@ -33,11 +34,14 @@ type Waiter = (slot: Slot) => void;
 
 const DEFAULT_ACQUIRE_TIMEOUT_MS = 30_000;
 const DEFAULT_REFILL_BACKOFF_MS = 120_000;
+const DEFAULT_MAX_CONCURRENT_REFILLS = 20;
 
 export class CookieJar {
     private options: CookieJarOptions;
     private slots: Slot[];
     private waiters: Waiter[] = [];
+    private launchInFlight = 0;
+    private launchWaiters: Array<() => void> = [];
 
     constructor(options: CookieJarOptions) {
         if (!options.proxies.length) {
@@ -55,10 +59,31 @@ export class CookieJar {
         const bo = this.options.browserOptions;
         return Browser.launch({
             ...bo,
-            user_data_dir: `${bo.user_data_dir ?? './chrome-data'}-${this.randomString()}`,
+            user_data_dir: `${bo.user_data_dir ?? './chrome-profiles'}/chrome-profile-${this.randomString()}`,
             headless: bo.headless ?? true,
             proxy,
         });
+    }
+
+    /** Gate concurrent browser launches so we don't overwhelm the host. */
+    private async acquireLaunchSlot(): Promise<void> {
+        const max = this.options.maxConcurrentRefills ?? DEFAULT_MAX_CONCURRENT_REFILLS;
+        if (this.launchInFlight < max) {
+            this.launchInFlight++;
+            return;
+        }
+        await new Promise<void>(resolve => {
+            this.launchWaiters.push(() => {
+                this.launchInFlight++;
+                resolve();
+            });
+        });
+    }
+
+    private releaseLaunchSlot(): void {
+        this.launchInFlight--;
+        const next = this.launchWaiters.shift();
+        if (next) next();
     }
 
     /** Refill loops until success. Failures back off for `refillBackoffMs` and retry. */
@@ -66,24 +91,30 @@ export class CookieJar {
         const backoff = this.options.refillBackoffMs ?? DEFAULT_REFILL_BACKOFF_MS;
         while (true) {
             slot.state = 'refilling';
+            await this.acquireLaunchSlot();
+            let success = false;
             try {
                 const browser = await this.launchBrowser(slot.proxy);
-                let cookie: string;
                 try {
-                    cookie = await this.options.fetchCookie(browser, this.options.url);
+                    const cookie = await this.options.fetchCookie(browser, this.options.url);
+                    if (!cookie) throw new Error('fetchCookie returned empty cookie');
+                    slot.cookie = cookie;
+                    success = true;
                 } finally {
                     await browser.close().catch(() => {});
                 }
-                if (!cookie) throw new Error('fetchCookie returned empty cookie');
-                slot.cookie = cookie;
-                slot.state = 'idle';
-                this.dispatchWaiters();
-                return;
             } catch (err) {
                 slot.cookie = null;
                 slot.state = 'cooling_down';
-                await new Promise(r => setTimeout(r, backoff));
+            } finally {
+                this.releaseLaunchSlot();
             }
+            if (success) {
+                slot.state = 'idle';
+                this.dispatchWaiters();
+                return;
+            }
+            await new Promise(r => setTimeout(r, backoff));
         }
     }
 
