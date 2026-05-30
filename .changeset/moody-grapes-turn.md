@@ -1,0 +1,5 @@
+---
+"scrapechain": minor
+---
+
+custom cdp
