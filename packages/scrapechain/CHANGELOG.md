@@ -1,5 +1,11 @@
 # scrapechain
 
+## 0.4.1
+
+### Patch Changes
+
+- 6901ea3: optional extra chrome flags
+
 ## 0.4.0
 
 ### Minor Changes
