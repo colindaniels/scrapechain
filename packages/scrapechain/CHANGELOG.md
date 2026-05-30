@@ -1,5 +1,11 @@
 # scrapechain
 
+## 0.4.0
+
+### Minor Changes
+
+- 09466d2: custom cdp
+
 ## 0.3.1
 
 ### Patch Changes
