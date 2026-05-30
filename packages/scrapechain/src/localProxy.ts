@@ -27,7 +27,7 @@ export async function anonymizeProxy(upstreamUrl: string): Promise<string> {
         handleHttp(req, res, upstream.hostname, upstreamPort, authHeader),
     )
     server.on('connect', (req, client, head) =>
-        handleConnect(req, client, head, upstream.hostname, upstreamPort, authHeader, track),
+        handleConnect(req, client as net.Socket, head, upstream.hostname, upstreamPort, authHeader, track),
     )
 
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
