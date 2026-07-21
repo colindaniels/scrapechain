@@ -33,6 +33,32 @@ export interface BrowserOptions {
     extra_flags?: string[];
 }
 
+/** kill() only fires SIGKILL and returns — wait for the process to actually die
+ * before touching the profile dir, since a dying Chrome still has in-flight
+ * writes there. Timeout guards a lost exit event. */
+async function killAndWait(chrome: LaunchedChrome): Promise<void> {
+    const proc = chrome.process;
+    const exited = new Promise<void>(resolve => {
+        if (proc.exitCode !== null || proc.signalCode !== null) return resolve();
+        proc.once('exit', () => resolve());
+    });
+    try { chrome.kill(); } catch { /* ignore */ }
+    await Promise.race([exited, new Promise(r => setTimeout(r, 2000))]);
+}
+
+/** Delete the profile dir and verify it stays gone — a straggling Chrome helper
+ * process can resurrect it just after a successful rm. */
+async function removeProfileDir(dir: string): Promise<void> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+            await rm(dir, { recursive: true, force: true });
+        } catch { /* recheck below, then retry */ }
+        await new Promise(r => setTimeout(r, 250));
+        if (!existsSync(dir)) return;
+    }
+    console.warn(`[scrapechain] profile dir survived cleanup: ${dir}`);
+}
+
 export class Browser {
     private chrome: LaunchedChrome
     private browserOptions: BrowserOptions
@@ -155,26 +181,43 @@ export class Browser {
 
         mkdirSync(browserOptions.user_data_dir, { recursive: true });
 
-        const chrome = await ChromeLauncher.launch({
-            chromePath: browserOptions.chrome_path,
-            userDataDir: browserOptions.user_data_dir,
-            chromeFlags
-        });
+        // If launch fails partway, clean up whatever was created — otherwise the
+        // freshly-made profile dir (and possibly a live Chrome) leaks with no
+        // Browser instance left to close().
+        let chrome: LaunchedChrome | undefined;
+        try {
+            chrome = await ChromeLauncher.launch({
+                chromePath: browserOptions.chrome_path,
+                userDataDir: browserOptions.user_data_dir,
+                chromeFlags
+            });
 
-        const cdp = await CDP({ port: chrome.port }) as CDPClient;
-        const page = await Page.create(cdp);
+            const cdp = await CDP({ port: chrome.port }) as CDPClient;
+            const page = await Page.create(cdp);
 
-        return new Browser(chrome, browserOptions, cdp, page, localProxy);
+            return new Browser(chrome, browserOptions, cdp, page, localProxy);
+        } catch (err) {
+            if (chrome) await killAndWait(chrome);
+            if (localProxy) {
+                try { await closeAnonymizedProxy(localProxy, true); } catch { /* ignore */ }
+            }
+            await removeProfileDir(browserOptions.user_data_dir);
+            throw err;
+        }
     }
 
     async close() {
+        // Every step is independently guarded: a failure in any one must not
+        // skip the rest — especially the profile-dir removal at the end.
         for (const page of [...this.extraPages]) {
             try { await page.close(); } catch { /* ignore */ }
         }
-        await this.cdp.close();
-        this.chrome.kill();
-        if (this.localProxy) await closeAnonymizedProxy(this.localProxy, true);
-        await rm(this.browserOptions.user_data_dir, { recursive: true, force: true });
+        try { await this.cdp.close(); } catch { /* ignore */ }
+        await killAndWait(this.chrome);
+        if (this.localProxy) {
+            try { await closeAnonymizedProxy(this.localProxy, true); } catch { /* ignore */ }
+        }
+        await removeProfileDir(this.browserOptions.user_data_dir);
     }
 
     getFingerprint() {
