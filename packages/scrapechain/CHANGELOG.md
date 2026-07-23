@@ -1,5 +1,11 @@
 # scrapechain
 
+## 0.5.0
+
+### Minor Changes
+
+- 2e4df5b: revamped cookie pooling
+
 ## 0.4.1
 
 ### Patch Changes
